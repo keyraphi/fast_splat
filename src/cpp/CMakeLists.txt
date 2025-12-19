@@ -1,22 +1,3 @@
-# Find required packages
-find_package(CUDAToolkit REQUIRED)
-find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
-
-# Include nanobind
-include(FetchContent)
-FetchContent_Declare(
-    nanobind
-    GIT_REPOSITORY https://github.com/wjakob/nanobind
-    GIT_TAG master
-)
-FetchContent_MakeAvailable(nanobind)
-
-# Enable CUDA
-enable_language(CUDA)
-set(CUDA_ARCHITECTURES 75 80 86 89 90)
-# set(CUDA_ARCHITECTURES 75) # TEMPORAYR for faster compilation
-set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCHITECTURES})
-
 # Single shared library for the Python extension
 nanobind_add_module(fast_splat_2d_backend
     fast_splat_2d.cpp
