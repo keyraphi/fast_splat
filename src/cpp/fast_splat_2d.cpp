@@ -121,7 +121,7 @@ auto fast_splat_2d_cuda(const PatchListTypeCUDA &patch_list,
                           target_image.shape(1), target_image.shape(0));
 
   nb::capsule owner(result_data,
-                    [](void *ptr) noexcept -> void { delete[] (float *)ptr; });
+                    [](void *ptr) noexcept -> void { cuda::cuda_free(ptr); });
   printf("Returning result!\n");
   return TargetImageTypeCUDA(
       result_data,
