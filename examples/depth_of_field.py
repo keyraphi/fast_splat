@@ -146,7 +146,7 @@ def main():
 
     xs, ys = np.meshgrid(np.arange(img.shape[1]), np.arange(img.shape[0]))
     pixel_coordinates = np.stack([xs, ys], axis=-1)
-    pixel_coordinates = pixel_coordinates.reshape([-1, 2], copy=True)
+    pixel_coordinates = pixel_coordinates.reshape([-1, 2])
 
     if args.use_gpu:
         device = "cpu"
