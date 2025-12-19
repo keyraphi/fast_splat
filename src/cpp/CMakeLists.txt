@@ -13,7 +13,7 @@ FetchContent_MakeAvailable(nanobind)
 
 # Enable CUDA
 enable_language(CUDA)
-set(CUDA_ARCHITECTURES 75 80 86 89 90 100 103 120)
+set(CUDA_ARCHITECTURES 75 80 86 89 90)
 # set(CUDA_ARCHITECTURES 75) # TEMPORAYR for faster compilation
 set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCHITECTURES})
 
