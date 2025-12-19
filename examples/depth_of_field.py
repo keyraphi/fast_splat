@@ -149,8 +149,8 @@ def main():
     pixel_coordinates = pixel_coordinates.reshape([-1, 2])
 
     if args.use_gpu:
-        device = "cpu"
-        # device = "cuda:0"
+        # device = "cpu"
+        device = "cuda:0"
         blur_radius_px_list = torch.as_tensor(blur_radius_px_list, device=device)
         pixel_coordinates = torch.as_tensor(pixel_coordinates, device=device)
         pixel_list = torch.as_tensor(pixel_list, device=device)
