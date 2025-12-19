@@ -72,6 +72,7 @@ def main():
     args = parser.parse_args()
 
     img = iio.imread("scene.exr", plugin="opencv", flags=cv2.IMREAD_UNCHANGED)[:, :, :3]
+    img = img * 0.5
     depth = iio.imread("depth.exr", plugin="opencv", flags=cv2.IMREAD_UNCHANGED)[
         :, :, 0
     ]
@@ -94,7 +95,9 @@ def main():
     blur_radius_px = blur_radius / pixel_size
     max_blur_px = int(np.ceil(np.max(blur_radius_px)))
 
-    print("max splat radius:", max_blur_px)
+    print(
+        f"max splat radius: {max_blur_px} => patch sizes: ({max_blur_px * 2 + 1}, {max_blur_px * 2 + 1})"
+    )
     fig_blur_radius = plt.figure(figsize=(6, 6))
     blur_radius_ax = fig_blur_radius.add_subplot(111)
     blur_radius_ax.imshow(blur_radius_px)
@@ -140,12 +143,14 @@ def main():
     print(f"Splatting on CPU took {duration_splatting} sec.")
 
     # Show result
-    fig_img = plt.figure(figsize=(6, 12))
+    fig_img = plt.figure(figsize=(12, 6))
     ax_sharp = fig_img.add_subplot(121)
-    ax_sharp.imshow(aces_approx(img))
+    # ax_sharp.imshow(aces_approx(img))
+    ax_sharp.imshow(reinhard(img))
 
     ax_cpu = fig_img.add_subplot(122, sharex=ax_sharp, sharey=ax_sharp)
-    ax_cpu.imshow(aces_approx(np.from_dlpack(result_image)))
+    ax_cpu.imshow(reinhard(np.from_dlpack(result_image)))
+    fig_img.tight_layout()
     fig_img.show()
 
     plt.show()
