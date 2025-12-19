@@ -1,9 +1,5 @@
 [build-system]
-requires = [
-    "ninja",
-    "scikit-build-core[pyproject]",
-    "numpy"
-]
+requires = ["scikit-build-core>=0.10.0", "nanobind>=2.1.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -24,3 +20,7 @@ dev = [
 
 [tool.scikit-build]
 cmake.minimum-version = "3.18"
+# This ensures the .so file is placed inside the package folder
+wheel.expand-macos-universal-tags = true
+install.components = ["python_modules"]
+wheel.install-dir = "fast_splat_2d"

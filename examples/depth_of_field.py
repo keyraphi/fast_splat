@@ -28,6 +28,29 @@ def create_circles_of_confusion(circle_radius_list: np.ndarray, max_blur_px: int
     patches = patches / np.sum(np.sum(patches, axis=-1), axis=-1)[:, None, None]
     return patches
 
+def create_circles_of_confusion_gpu(circle_radius_list: torch.Tensor, max_blur_px: int):
+    device = circle_radius_list.device
+    radii = circle_radius_list
+    
+    radius_clamped = torch.maximum(radii - 0.5, torch.tensor(1e-6, device=device))
+    
+    steps = 2 * max_blur_px + 1
+    line = torch.linspace(-max_blur_px, max_blur_px, steps, device=device)
+    
+    ys, xs = torch.meshgrid(line, line, indexing='ij')
+    
+    points = torch.stack([ys, xs], dim=-1)
+    dist_patch = torch.linalg.vector_norm(points, dim=-1)
+    
+    patches = dist_patch[None, :, :] < radius_clamped[:, None, None]
+    patches = patches.to(torch.float32)
+    
+    sums = torch.sum(patches, dim=(1, 2), keepdim=True)
+    
+    patches = patches / torch.clamp(sums, min=1e-8)
+    
+    return patches
+
 
 # some tonemappiung
 def reinhard(img):
@@ -71,7 +94,7 @@ def main():
     )
     parser.add_argument(
         "--use_gpu",
-        action="store_true"
+        action="store_true",
         help="If this flag is set the splatting is done on GPU.",
     )
 
@@ -115,7 +138,6 @@ def main():
     indices = np.arange(img.shape[0] * img.shape[1])
     np.random.shuffle(indices)
     batch_indices = np.array_split(indices, n_batches)
-    result_image = np.zeros_like(img)
 
     duration_circle_creation = 0
     duration_splatting = 0
@@ -127,8 +149,14 @@ def main():
     pixel_coordinates = pixel_coordinates.reshape([-1, 2], copy=True)
 
     if args.use_gpu:
-        pixel_coordinates = torch.from_numpy(pixel_coordinates)
+        device = "cpu"
+        # device = "cuda:0"
+        blur_radius_px_list = torch.as_tensor(blur_radius_px_list, device=device)
+        pixel_coordinates = torch.as_tensor(pixel_coordinates, device=device)
+        pixel_list = torch.as_tensor(pixel_list, device=device)
+        result_image = torch.zeros([img.shape[0], img.shape[1], img.shape[2]], dtype=torch.float32, device=device)
         for indices in tqdm(batch_indices):
+            indices = torch.as_tensor(indices, device=device)
             # create patches to splat
             time_before_circle_creation = time()
             patch_list_batch = create_circles_of_confusion_gpu(
@@ -138,6 +166,7 @@ def main():
                 patch_list_batch[:, :, :, None] * pixel_list[indices, None, None, :]
             )
             position_list_batch = pixel_coordinates[indices]
+            # torch.cuda.synchronize()
             duration_circle_creation += time() - time_before_circle_creation
 
             # splat
@@ -145,8 +174,11 @@ def main():
             result_image = fast_splat_2d.splat(
                 patch_list_batch, position_list_batch, result_image
             )
+            # torch.cuda.synchronize()
             duration_splatting += time() - time_before_splatting
+        result_image = torch.from_dlpack(result_image).cpu()
     else:
+        result_image = np.zeros_like(img)
         for indices in tqdm(batch_indices):
             # create patches to splat
             time_before_circle_creation = time()
@@ -165,6 +197,7 @@ def main():
                 patch_list_batch, position_list_batch, result_image
             )
             duration_splatting += time() - time_before_splatting
+        result_image = np.from_dlpack(result_image)
 
     print(f"Creating the patches took {duration_circle_creation} sec.")
     print(f"Splatting on CPU took {duration_splatting} sec.")
@@ -177,7 +210,7 @@ def main():
 
     ax_cpu = fig_img.add_subplot(122, sharex=ax_sharp, sharey=ax_sharp)
     # ax_cpu.imshow(aces_approx(np.from_dlpack(result_image)))
-    ax_cpu.imshow(reinhard(np.from_dlpack(result_image)))
+    ax_cpu.imshow(reinhard(result_image))
     fig_img.tight_layout()
     fig_img.show()
 

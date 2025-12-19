@@ -123,7 +123,7 @@ auto fast_splat_2d_cuda(const PatchListTypeCUDA &patch_list,
       owner);
 }
 
-NB_MODULE(fast_splat_2d, module) {
+NB_MODULE(fast_splat_2d_backend, module) {
   module.doc() = "This module contains a fast splatting function for splatting "
                  "to a target image. "
                  "It either runs on CPU or on GPU, depending if the input "
