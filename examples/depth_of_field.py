@@ -5,6 +5,7 @@ import argparse
 import matplotlib.pyplot as plt
 import cv2
 import fast_splat_2d
+import torch
 from tqdm.auto import tqdm
 
 
@@ -68,6 +69,11 @@ def main():
         default=100000,
         help="Number of patches to splat simultaneously. This is limiting the memory that is used.",
     )
+    parser.add_argument(
+        "--use_gpu",
+        action="store_true"
+        help="If this flag is set the splatting is done on GPU.",
+    )
 
     args = parser.parse_args()
 
@@ -120,24 +126,45 @@ def main():
     pixel_coordinates = np.stack([xs, ys], axis=-1)
     pixel_coordinates = pixel_coordinates.reshape([-1, 2], copy=True)
 
-    for indices in tqdm(batch_indices):
-        # create patches to splat
-        time_before_circle_creation = time()
-        patch_list_batch = create_circles_of_confusion(
-            blur_radius_px_list[indices], max_blur_px
-        )
-        patch_list_batch = (
-            patch_list_batch[:, :, :, None] * pixel_list[indices, None, None, :]
-        )
-        position_list_batch = pixel_coordinates[indices]
-        duration_circle_creation += time() - time_before_circle_creation
+    if args.use_gpu:
+        pixel_coordinates = torch.from_numpy(pixel_coordinates)
+        for indices in tqdm(batch_indices):
+            # create patches to splat
+            time_before_circle_creation = time()
+            patch_list_batch = create_circles_of_confusion_gpu(
+                blur_radius_px_list[indices], max_blur_px
+            )
+            patch_list_batch = (
+                patch_list_batch[:, :, :, None] * pixel_list[indices, None, None, :]
+            )
+            position_list_batch = pixel_coordinates[indices]
+            duration_circle_creation += time() - time_before_circle_creation
 
-        # splat
-        time_before_splatting = time()
-        result_image = fast_splat_2d.splat(
-            patch_list_batch, position_list_batch, result_image
-        )
-        duration_splatting += time() - time_before_splatting
+            # splat
+            time_before_splatting = time()
+            result_image = fast_splat_2d.splat(
+                patch_list_batch, position_list_batch, result_image
+            )
+            duration_splatting += time() - time_before_splatting
+    else:
+        for indices in tqdm(batch_indices):
+            # create patches to splat
+            time_before_circle_creation = time()
+            patch_list_batch = create_circles_of_confusion(
+                blur_radius_px_list[indices], max_blur_px
+            )
+            patch_list_batch = (
+                patch_list_batch[:, :, :, None] * pixel_list[indices, None, None, :]
+            )
+            position_list_batch = pixel_coordinates[indices]
+            duration_circle_creation += time() - time_before_circle_creation
+
+            # splat
+            time_before_splatting = time()
+            result_image = fast_splat_2d.splat(
+                patch_list_batch, position_list_batch, result_image
+            )
+            duration_splatting += time() - time_before_splatting
 
     print(f"Creating the patches took {duration_circle_creation} sec.")
     print(f"Splatting on CPU took {duration_splatting} sec.")
@@ -149,6 +176,7 @@ def main():
     ax_sharp.imshow(reinhard(img))
 
     ax_cpu = fig_img.add_subplot(122, sharex=ax_sharp, sharey=ax_sharp)
+    # ax_cpu.imshow(aces_approx(np.from_dlpack(result_image)))
     ax_cpu.imshow(reinhard(np.from_dlpack(result_image)))
     fig_img.tight_layout()
     fig_img.show()

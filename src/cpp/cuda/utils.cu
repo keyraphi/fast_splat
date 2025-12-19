@@ -4,7 +4,6 @@
 #include <cuda_runtime_api.h>
 #include <driver_types.h>
 #include <nanobind/ndarray.h>
-#include <optional>
 #include <stdexcept>
 #include <thrust/device_ptr.h>
 #include <thrust/fill.h>

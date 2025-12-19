@@ -1,10 +1,8 @@
 #pragma once
-#include <cmath>
 #include <cstddef>
 #include <cuda_runtime_api.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
-#include <optional>
 
 namespace nb = nanobind;
 
