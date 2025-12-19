@@ -1,6 +1,5 @@
 #include "utils.h"
 #include <cstddef>
-#include <cuda/std/detail/libcxx/include/optional>
 #include <cuda_runtime_api.h>
 #include <driver_types.h>
 #include <nanobind/ndarray.h>
