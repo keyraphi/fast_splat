@@ -13,6 +13,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
+#include <thrust/iterator/discard_iterator.h>
 #include <thrust/scan.h>
 #include <tuple>
 #include <vector_types.h>
@@ -92,7 +93,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
   // number of entries per row
   thrust::device_vector<uint32_t> row_sums(rows);
   thrust::reduce_by_key(keys_begin, keys_begin + (rows * columns),
-                        bitmap.begin(), thrust::make_discard_iterator(),
+                        bitmap.begin(), thrust::discard_iterator<>(),
                         row_sums.begin());
   // start of each row
   thrust::device_vector<uint32_t> row_offsets(rows);
@@ -133,17 +134,17 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_left * weight_top;
       uint32_t tile_idx = left * 3 + top * N_THREADS_X * 3;
-      atomicAdd(tile+tile_idx, src_red * weight);
-      atomicAdd(tile+tile_idx + 1, src_red * weight);
-      atomicAdd(tile+tile_idx + 2, src_red * weight);
+      atomicAdd(tile + tile_idx, src_red * weight);
+      atomicAdd(tile + tile_idx + 1, src_red * weight);
+      atomicAdd(tile + tile_idx + 2, src_red * weight);
     }
     if (bottom >= 0 && bottom < N_THREADS_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_left * weight_bottom;
       uint32_t tile_idx = left * 3 + bottom * N_THREADS_X * 3;
-      atomicAdd(tile+tile_idx, src_red * weight);
-      atomicAdd(tile+tile_idx + 1, src_red * weight);
-      atomicAdd(tile+tile_idx + 2, src_red * weight);
+      atomicAdd(tile + tile_idx, src_red * weight);
+      atomicAdd(tile + tile_idx + 1, src_red * weight);
+      atomicAdd(tile + tile_idx + 2, src_red * weight);
     }
   }
   if (right >= 0 && right < N_THREADS_X) {
@@ -152,17 +153,17 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_right * weight_top;
       uint32_t tile_idx = right * 3 + top * N_THREADS_X * 3;
-      atomicAdd(tile+tile_idx, src_red * weight);
-      atomicAdd(tile+tile_idx + 1, src_red * weight);
-      atomicAdd(tile+tile_idx + 2, src_red * weight);
+      atomicAdd(tile + tile_idx, src_red * weight);
+      atomicAdd(tile + tile_idx + 1, src_red * weight);
+      atomicAdd(tile + tile_idx + 2, src_red * weight);
     }
     if (bottom >= 0 && bottom < N_THREADS_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_right * weight_bottom;
       uint32_t tile_idx = right * 3 + bottom * N_THREADS_X * 3;
-      atomicAdd(tile+tile_idx, src_red * weight);
-      atomicAdd(tile+tile_idx + 1, src_red * weight);
-      atomicAdd(tile+tile_idx + 2, src_red * weight);
+      atomicAdd(tile + tile_idx, src_red * weight);
+      atomicAdd(tile + tile_idx + 1, src_red * weight);
+      atomicAdd(tile + tile_idx + 2, src_red * weight);
     }
   }
 }
@@ -174,7 +175,6 @@ __global__ void fast_splat_2d_kernel(
     const uint32_t *patches_per_tile, const uint32_t *tile_index_offsets,
     float *__restrict__ result, const size_t target_width,
     const size_t target_height) {
-  size_t tid = threadIdx.x + blockIdx.x * blockDim.x;
   uint32_t tile_id = blockIdx.x;
 
   uint32_t tiles_per_width = target_width / N_THREADS_X;
