@@ -1,0 +1,41 @@
+CompileFlags:
+  Add:
+    - -std=c++20
+    - -Wall
+    - -Wextra
+    # do not complain about features incompatible with sm_35
+    - --cuda-gpu-arch=sm_75
+    - -fopenmp
+  Remove:
+    - --expt-relaxed-constexpr
+    - --default-stream
+    - --generate-code=*
+    - --options-file
+    - -arch=*
+    - -forward-unknown-to-host-compiler
+    - -Xptxas=*
+    - -Xcompiler=*
+  CompilationDatabase: "build"
+
+InlayHints:
+  # Disables automatic insertion of missing #include statements on completion
+  autoDeclaration: false
+
+Diagnostics:
+  ClangTidy:
+    Add: 
+      - modernize-*
+      - readability-*
+      - performance-*
+      - bugprone-*
+    Remove:
+      - bugprone-macro-parentheses
+      - bugprone-easily-swappable-parameters
+      - readability-identifier-length
+      - readability-math-missing-parentheses
+  UnusedIncludes: Strict
+  MissingIncludes: Strict
+
+Index:
+  Background: Build
+  

@@ -1,0 +1,155 @@
+from time import time
+import imageio.v3 as iio
+import numpy as np
+import argparse
+import matplotlib.pyplot as plt
+import cv2
+import fast_splat_2d
+from tqdm.auto import tqdm
+
+
+def create_circles_of_confusion(circle_radius_list: np.ndarray, max_blur_px: int):
+    radius = np.maximum(circle_radius_list - 0.5, 1e-6)
+    patches = np.zeros([radius.shape[0], 2 * max_blur_px + 1, 2 * max_blur_px + 1])
+
+    # create patches that contain the pixel distances to the center of the patch
+    line = np.linspace(
+        np.floor(-max_blur_px), np.ceil(max_blur_px), 2 * int(np.ceil(max_blur_px)) + 1
+    )
+    xs, ys = np.meshgrid(line, line)
+    points = np.stack([ys, xs], axis=-1)
+    distances_patch = np.linalg.norm(points, axis=-1)
+    patches[:] = distances_patch
+
+    # use actual radii to mask away distances that are further away
+    patches = patches < radius[:, None, None]
+    patches = patches.astype(np.float32)
+    patches = patches / np.sum(np.sum(patches, axis=-1), axis=-1)[:, None, None]
+    return patches
+
+
+# some tonemappiung
+def reinhard(img):
+    img = img / (1 + img)
+    # Apply gamma
+    return np.clip(img, 0, 1) ** (1 / 2.2)
+
+
+# some more tonemapping
+def aces_approx(x):
+    # Standard fitted constants for ACES filmic curve
+    a = 2.51
+    b = 0.03
+    c = 2.43
+    d = 0.59
+    e = 0.14
+    # The curve
+    res = (x * (a * x + b)) / (x * (c * x + d) + e)
+    return np.clip(res, 0, 1) ** (1 / 2.2)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--focus_distance",
+        type=float,
+        default=11,
+        help="Focus distance of camera in meter",
+    )
+    parser.add_argument(
+        "--f_number",
+        type=float,
+        default=1.4,
+        help="F-number on the lens. Determines aperture radius.",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=100000,
+        help="Number of patches to splat simultaneously. This is limiting the memory that is used.",
+    )
+
+    args = parser.parse_args()
+
+    img = iio.imread("scene.exr", plugin="opencv", flags=cv2.IMREAD_UNCHANGED)[:, :, :3]
+    depth = iio.imread("depth.exr", plugin="opencv", flags=cv2.IMREAD_UNCHANGED)[
+        :, :, 0
+    ]
+
+    focal_length = 25.5 * 1e-3  # 25.5 mm lens was used
+    f_number = args.f_number
+    aperture_radius = focal_length / (2 * f_number)
+    horizontal_film_size = 0.036  # 36 mm
+    pixel_size = horizontal_film_size / img.shape[1]
+    focus_distance = args.focus_distance
+
+    # lens maker equations
+    distance_senor_lens = 1 / (1 / focal_length - 1 / focus_distance)
+
+    blur_radius = (
+        np.abs(distance_senor_lens - 1 / (1 / focal_length - 1 / depth))
+        * (1 / focal_length - 1 / depth)
+        * aperture_radius
+    )
+    blur_radius_px = blur_radius / pixel_size
+    max_blur_px = int(np.ceil(np.max(blur_radius_px)))
+
+    print("max splat radius:", max_blur_px)
+    fig_blur_radius = plt.figure(figsize=(6, 6))
+    blur_radius_ax = fig_blur_radius.add_subplot(111)
+    blur_radius_ax.imshow(blur_radius_px)
+    fig_blur_radius.show()
+
+    # Compute patches in batches of fixed size and add them to result incrementally
+    batch_size = args.batch_size
+    n_batches = int(np.ceil(img.shape[0] * img.shape[1] / batch_size))
+    indices = np.arange(img.shape[0] * img.shape[1])
+    np.random.shuffle(indices)
+    batch_indices = np.array_split(indices, n_batches)
+    result_image = np.zeros_like(img)
+
+    duration_circle_creation = 0
+    duration_splatting = 0
+    pixel_list = np.reshape(img, [-1, 3])
+    blur_radius_px_list = np.reshape(blur_radius_px, [-1])
+
+    xs, ys = np.meshgrid(np.arange(img.shape[1]), np.arange(img.shape[0]))
+    pixel_coordinates = np.stack([xs, ys], axis=-1)
+    pixel_coordinates = pixel_coordinates.reshape([-1, 2], copy=True)
+
+    for indices in tqdm(batch_indices):
+        # create patches to splat
+        time_before_circle_creation = time()
+        patch_list_batch = create_circles_of_confusion(
+            blur_radius_px_list[indices], max_blur_px
+        )
+        patch_list_batch = (
+            patch_list_batch[:, :, :, None] * pixel_list[indices, None, None, :]
+        )
+        position_list_batch = pixel_coordinates[indices]
+        duration_circle_creation += time() - time_before_circle_creation
+
+        # splat
+        time_before_splatting = time()
+        result_image = fast_splat_2d.splat(
+            patch_list_batch, position_list_batch, result_image
+        )
+        duration_splatting += time() - time_before_splatting
+
+    print(f"Creating the patches took {duration_circle_creation} sec.")
+    print(f"Splatting on CPU took {duration_splatting} sec.")
+
+    # Show result
+    fig_img = plt.figure(figsize=(6, 12))
+    ax_sharp = fig_img.add_subplot(121)
+    ax_sharp.imshow(aces_approx(img))
+
+    ax_cpu = fig_img.add_subplot(122, sharex=ax_sharp, sharey=ax_sharp)
+    ax_cpu.imshow(aces_approx(np.from_dlpack(result_image)))
+    fig_img.show()
+
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()

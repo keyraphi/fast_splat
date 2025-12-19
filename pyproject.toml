@@ -1,0 +1,27 @@
+[build-system]
+requires = [
+    "cmake>=3.18",
+    "ninja",
+    "scikit-build-core[pyproject]",
+    "numpy"
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "fast_splat_2d"
+version = "0.1.0"
+description = "A fast function for 2D splatting into a target image. There is a cpu and a gpu backend, which is automatically selected based on where the inputs life. A binding for pytorch tensors is provided."
+authors = [
+    { name = "Raphael Braun", email = "keyraphi@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort"
+]
+
+[tool.scikit-build]
+cmake.minimum-version = "3.18"
