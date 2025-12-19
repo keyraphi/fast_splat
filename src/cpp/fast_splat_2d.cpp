@@ -89,13 +89,17 @@ auto fast_splat_2d_cuda(const PatchListTypeCUDA &patch_list,
                         const PositionListTypeCUDA &position_list,
                         TargetImageTypeCUDA &target_image)
     -> TargetImageTypeCUDA {
-
+  printf("auto fast_splat_2d_cuda(const PatchListTypeCUDA &patch_list,\n"
+                        "const PositionListTypeCUDA &position_list,\n"
+                        "TargetImageTypeCUDA &target_image)\n");
   size_t n_patches = check_dimensions(patch_list, position_list);
+  printf("n_patches: %lu\n", n_patches);
 
   // First ensure that correct gpu is used for all allocations and computations
   int target_device =
       cuda::get_common_cuda_device(patch_list, position_list, target_image);
   cuda::ScopedCudaDevice device(target_device);
+  printf("traget_device: %d\n", target_device);
 
   // copy target image
   float *result_data;
@@ -110,6 +114,7 @@ auto fast_splat_2d_cuda(const PatchListTypeCUDA &patch_list,
                              target_image.shape(1) * target_image.shape(2))) {
     throw std::runtime_error("Failed to copy Target image for output");
   }
+  printf("Allocated result data sucessfully!\n");
 
   fast_splat_2d_cuda_impl(patch_list.data(), position_list.data(), n_patches,
                           patch_list.shape(2), patch_list.shape(1), result_data,
@@ -117,6 +122,7 @@ auto fast_splat_2d_cuda(const PatchListTypeCUDA &patch_list,
 
   nb::capsule owner(result_data,
                     [](void *ptr) noexcept -> void { delete[] (float *)ptr; });
+  printf("Returning result!\n");
   return TargetImageTypeCUDA(
       result_data,
       {target_image.shape(0), target_image.shape(1), target_image.shape(2)},

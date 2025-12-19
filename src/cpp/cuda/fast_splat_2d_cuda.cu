@@ -2,25 +2,34 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <cub/cub.cuh>
-#include <cub/device/device_scan.cuh>
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 #include <curand_mtgp32.h>
 #include <driver_types.h>
 #include <sys/types.h>
+#include <thrust/copy.h>
 #include <thrust/device_vector.h>
 #include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/transform_iterator.h>
 #include <thrust/iterator/discard_iterator.h>
-#include <thrust/copy.h>
+#include <thrust/iterator/transform_iterator.h>
 #include <thrust/scan.h>
 #include <tuple>
 #include <vector_types.h>
 
+#include <string>
+
 #define N_THREADS_X 64
 #define N_THREADS_Y 64
+
+void cuda_debug_print(const std::string &kernel_name) {
+  cudaError_t err = cudaDeviceSynchronize();
+  if (err != cudaSuccess) {
+    printf("%s: CUDA Error: %s\n", kernel_name.c_str(), cudaGetErrorString(err));
+  } else {
+    printf("Kernel %s finished successfully!\n", kernel_name.c_str());
+  }
+}
 
 /** Finds out if the given positions in the position list (x, y) have an effect
  * on a target patch. The target patch size is defined by N_THREADS_X and
@@ -80,7 +89,11 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
     -> std::tuple<thrust::device_vector<uint32_t>,
                   thrust::device_vector<uint32_t>,
                   thrust::device_vector<uint32_t>> {
-
+  printf("auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> "
+         "&bitmap,\n"
+         "const size_t rows, const size_t columns)\n"
+         "rows: %lu, columns: %lu\n",
+         rows, columns);
   // prefix sum over each row
   auto make_key = [columns] __host__ __device__(uint32_t idx) {
     return idx / static_cast<uint32_t>(columns);
@@ -91,14 +104,17 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
   thrust::device_vector<uint32_t> prefix_sum(rows * columns);
   thrust::exclusive_scan_by_key(keys_begin, keys_begin + (rows * columns),
                                 bitmap.begin(), prefix_sum.begin());
+  cuda_debug_print("exclusive_scan_by_key");
   // number of entries per row
   thrust::device_vector<uint32_t> row_sums(rows);
   thrust::reduce_by_key(keys_begin, keys_begin + (rows * columns),
                         bitmap.begin(), thrust::discard_iterator<>(),
                         row_sums.begin());
+  cuda_debug_print("reduce_by_key");
   // start of each row
   thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
+  cuda_debug_print("exclusive_scan");
 
   //  write indices of patches together
   auto column_indices_begin = thrust::make_transform_iterator(
@@ -117,6 +133,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
                   bitmap.begin(), // Stencil: bitmap values (0 or 1)
                   result.begin(), // Destination
                   [] __host__ __device__(uint32_t val) { return val == 1; });
+  cuda_debug_print("copy_if");
 
   return {result, row_sums, row_offsets};
 }
@@ -255,11 +272,21 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
                         const size_t patch_height, float *__restrict__ result,
                         const size_t target_width, const size_t target_height) {
   // Determine how many target patches there will be
+  printf("fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,\n"
+         "const float *__restrict__ position_list,\n"
+         "const size_t patch_count, const size_t patch_width,\n"
+         "const size_t patch_height, float *__restrict__ result,\n"
+         "const size_t target_width, const size_t target_height) {\n"
+         ")\n"
+         "patch_count: %lu, patch_width: %lu, patch_height: %lu, target_width: "
+         "%lu, traget_height: %lu\n",
+         patch_count, patch_width, patch_height, target_width, target_height);
   size_t targe_patches_X = (target_width + N_THREADS_X - 1) / N_THREADS_X;
   size_t targe_patches_Y = (target_height + N_THREADS_Y - 1) / N_THREADS_Y;
   size_t m_target_patches = targe_patches_X * targe_patches_Y;
   thrust::device_vector<uint32_t> used_patches_bitmap(m_target_patches *
                                                       patch_count);
+  printf("Allocated used_patches_bitmap\n");
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
 
@@ -269,6 +296,8 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       position_list, patch_count, patch_radius_x, patch_radius_y, target_width,
       used_patches_bitmap.data().get());
 
+  cuda_debug_print("find_source_patches_for_target_patches");
+
   const auto [indices, patches_per_tile, tile_index_offsets] =
       compute_indices_from_bitmap(used_patches_bitmap, m_target_patches,
                                   patch_count);
@@ -277,15 +306,5 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       patch_list, patch_width, patch_height, patch_count, position_list,
       indices.data().get(), patches_per_tile.data().get(),
       tile_index_offsets.data().get(), result, target_width, target_height);
-  // split target image into patches that fit into shared memory DONE
-  // for each of those M target patch find out which of the N patches in the
-  // patch_list need to be considered Result is a sparse MxN bitmap, 1 at (m, n)
-  // where target m needs input n Prefix sum over rows to get indices and total
-  // number of input patches K_m affecting each target patch m. Extract this
-  // number in an additional list of length M Run one block per target patch
-  //   load target image patch into shared memory
-  //   iterate over the K_m input patches.
-  //      parallel go over the pixels of the inputs and atommically add them to
-  //      the shared memory using bilinear interpolation.
-  //    write result into global memory (no attomics needed here).
+  cuda_debug_print("fast_splat_2d_kernel");
 }
