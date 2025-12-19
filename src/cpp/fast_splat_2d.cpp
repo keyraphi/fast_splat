@@ -1,11 +1,10 @@
 #include <cstddef>
 #include <cstring>
-#include <format>
-#include <iostream>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
+#include <sstream>
 #include <stdexcept>
 
 #include "cpu/fast_splat_2d_cpu.h"
@@ -18,9 +17,11 @@ using namespace nb::literals;
 // Device-specific type aliases with exact constraints
 
 using TargetImageTypeCPU =
-nb::ndarray<nb::array_api, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>;
+    nb::ndarray<nb::array_api, float, nb::shape<-1, -1, 3>, nb::c_contig,
+                nb::device::cpu>;
 using TargetImageTypeCUDA =
-nb::ndarray<nb::array_api, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cuda>;
+    nb::ndarray<nb::array_api, float, nb::shape<-1, -1, 3>, nb::c_contig,
+                nb::device::cuda>;
 using PatchListTypeCPU = nb::ndarray<const float, nb::shape<-1, -1, -1, 3>,
                                      nb::c_contig, nb::device::cpu>;
 using PatchListTypeCUDA = nb::ndarray<const float, nb::shape<-1, -1, -1, 3>,
@@ -34,13 +35,12 @@ size_t check_dimensions(const PatchListTypeCPU &patch_list,
                         const PositionListTypeCPU &position_list) {
   size_t patch_list_size = patch_list.shape(0);
   size_t position_list_size = position_list.shape(0);
-  if (patch_list_size != position_list_size) {
-    throw std::runtime_error(std::format(
-        "fast_splat_2d: The number of positions in the positon list ("
-        "{}"
-        ") has to match the number of patches in the patch_list ("
-        "{}.",
-        position_list_size, patch_list_size));
+  if (position_list_size != patch_list_size) {
+    std::stringstream ss;
+    ss << "fast_splat_2d: The number of positions (" << position_list_size
+       << ") must match the number of patches (" << patch_list_size << ").";
+
+    throw nb::value_error(ss.str().c_str());
   }
 
   return patch_list_size;
@@ -51,12 +51,10 @@ size_t check_dimensions(const PatchListTypeCUDA &patch_list,
   size_t patch_list_size = patch_list.shape(0);
   size_t position_list_size = position_list.shape(0);
   if (patch_list_size != position_list_size) {
-    throw std::runtime_error(std::format(
-        "fast_splat_2d: The number of positions in the positon list ("
-        "{}"
-        ") has to match the number of patches in the patch_list ("
-        "{}.",
-        position_list_size, patch_list_size));
+    std::stringstream ss;
+    ss << "fast_splat_2d: The number of positions (" << position_list_size
+       << ") must match the number of patches (" << patch_list_size << ").";
+    throw nb::value_error(ss.str().c_str());
   }
 
   return patch_list_size;

@@ -1,6 +1,5 @@
 [build-system]
 requires = [
-    "cmake>=3.18",
     "ninja",
     "scikit-build-core[pyproject]",
     "numpy"
