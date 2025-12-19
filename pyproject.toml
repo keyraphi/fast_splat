@@ -21,3 +21,4 @@ dev = [
 [tool.scikit-build]
 cmake.minimum-version = "3.18"
 wheel.packages = ["fast_splat_2d"]
+cmake.build-type = "Debug"
