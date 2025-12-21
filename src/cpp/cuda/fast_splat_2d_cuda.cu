@@ -1,4 +1,5 @@
 #include "fast_splat_2d_cuda.h"
+#include <__clang_cuda_builtin_vars.h>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -263,6 +264,12 @@ __global__ void fast_splat_2d_kernel(
     float patch_top = patch_center_pos_y - patch_radius_y;
     float patch_left_in_tile = patch_left - tile_x;
     float patch_top_in_tile = patch_top - tile_y;
+    if (threadIdx.x == 0) {
+      printf("patch center: (%f, %f),  top left: (%f, %f), in tile: (%f, %f)\n",
+             patch_center_pos_x, patch_center_pos_y, patch_left, patch_top,
+             patch_left_in_tile, patch_top_in_tile);
+    }
+
     // add the pixels of this patch to this tile at the correct positions using
     // bilinear interpolation
     for (uint32_t idx_in_patch = 0; idx_in_patch < patch_height * patch_width;
@@ -274,6 +281,9 @@ __global__ void fast_splat_2d_kernel(
       float src_blue = patch_list[patch_idx * patch_width * patch_height * 3 +
                                   idx_in_patch * 3 + 2];
 
+      if (threadIdx.x == 0) {
+        printf("rgb: (%f, %f, %f)\n", src_red, src_green, src_blue);
+      }
       uint32_t x_in_patch = idx_in_patch % patch_width;
       uint32_t y_in_patch = idx_in_patch % patch_height;
       float x_in_tile = x_in_patch + patch_left_in_tile;
@@ -330,8 +340,8 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       (m_target_patches * patch_count + THREADS - 1) / THREADS;
   printf("DEBUG: 3. THREADS: %lu, NM_BLOCKS: %lu\n", THREADS, NM_BLOCKS);
   find_source_patches_for_target_patches<<<NM_BLOCKS, THREADS>>>(
-      position_list, patch_count, patch_radius_x, patch_radius_y, target_width, m_target_patches,
-      used_patches_bitmap.data().get());
+      position_list, patch_count, patch_radius_x, patch_radius_y, target_width,
+      m_target_patches, used_patches_bitmap.data().get());
   // DEBUG 4:
   thrust::host_vector<uint32_t> bitmap_cpu = used_patches_bitmap;
   printf("DEBUG: 4. used_patches_bitmap\n");
