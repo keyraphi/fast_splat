@@ -3,7 +3,6 @@ CompileFlags:
     - -std=c++20
     - -Wall
     - -Wextra
-    # do not complain about features incompatible with sm_35
     - --cuda-gpu-arch=sm_75
     - -fopenmp
   Remove:

@@ -7,17 +7,16 @@
 #include <cuda_runtime_api.h>
 #include <curand_mtgp32.h>
 #include <driver_types.h>
+#include <string>
 #include <sys/types.h>
 #include <thrust/copy.h>
 #include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/discard_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/scan.h>
 #include <tuple>
-#include <vector_types.h>
-
-#include <string>
 
 #define N_THREADS_X 64
 #define N_THREADS_Y 64
@@ -25,7 +24,8 @@
 void cuda_debug_print(const std::string &kernel_name) {
   cudaError_t err = cudaDeviceSynchronize();
   if (err != cudaSuccess) {
-    printf("%s: CUDA Error: %s\n", kernel_name.c_str(), cudaGetErrorString(err));
+    printf("%s: CUDA Error: %s\n", kernel_name.c_str(),
+           cudaGetErrorString(err));
   } else {
     printf("Kernel %s finished successfully!\n", kernel_name.c_str());
   }
@@ -99,14 +99,44 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
   thrust::device_vector<uint32_t> prefix_sum(rows * columns);
   thrust::exclusive_scan_by_key(keys_begin, keys_begin + (rows * columns),
                                 bitmap.begin(), prefix_sum.begin());
+
+  // DEBUG 5:
+  thrust::host_vector<uint32_t> prefix_sums_cpu = prefix_sum;
+  printf("DEBUG: 5. prefix_sums\n");
+  for (size_t m = 0; m < rows; m++) {
+    for (size_t n = 0; n < columns; n++) {
+      printf("%u ", prefix_sums_cpu[m * columns + n]);
+    }
+    printf("\n");
+  }
+  // END DEBUG
+
   // number of entries per row
   thrust::device_vector<uint32_t> row_sums(rows);
   thrust::reduce_by_key(keys_begin, keys_begin + (rows * columns),
                         bitmap.begin(), thrust::discard_iterator<>(),
                         row_sums.begin());
+
+  // DEBUG 6:
+  thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
+  printf("DEBUG: 6. row_sums\n");
+  for (size_t m = 0; m < rows; m++) {
+    printf("%u ", row_sums_cpu[m]);
+    printf("\n");
+  }
+  // END DEBUG
   // start of each row
   thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
+
+  // DEBUG 7:
+  thrust::host_vector<uint32_t> row_offsets_cpu = row_offsets;
+  printf("DEBUG: 7. row_offsets\n");
+  for (size_t m = 0; m < rows; m++) {
+    printf("%u ", row_offsets_cpu[m]);
+    printf("\n");
+  }
+  // END DEBUG
 
   //  write indices of patches together
   auto column_indices_begin = thrust::make_transform_iterator(
@@ -125,6 +155,17 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
                   bitmap.begin(), // Stencil: bitmap values (0 or 1)
                   result.begin(), // Destination
                   [] __host__ __device__(uint32_t val) { return val == 1; });
+  // DEBUG 8:
+  thrust::host_vector<uint32_t> result_cpu = result;
+  printf("DEBUG: 8. result\n");
+  size_t i = 0;
+  for (size_t m = 0; m < rows; m++) {
+    for (size_t n = 0; n < row_sums_cpu[m]; n++, i++) {
+      printf("%u ", result_cpu[i]);
+    }
+    printf("\n");
+  }
+  // END DEBUG
 
   return {result, row_sums, row_offsets};
 }
@@ -263,19 +304,36 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
                         const size_t patch_height, float *__restrict__ result,
                         const size_t target_width, const size_t target_height) {
   // Determine how many target patches there will be
-  size_t targe_patches_X = (target_width + N_THREADS_X - 1) / N_THREADS_X;
-  size_t targe_patches_Y = (target_height + N_THREADS_Y - 1) / N_THREADS_Y;
-  size_t m_target_patches = targe_patches_X * targe_patches_Y;
+  size_t target_patches_X = (target_width + N_THREADS_X - 1) / N_THREADS_X;
+  size_t target_patches_Y = (target_height + N_THREADS_Y - 1) / N_THREADS_Y;
+  size_t m_target_patches = target_patches_X * target_patches_Y;
   thrust::device_vector<uint32_t> used_patches_bitmap(m_target_patches *
                                                       patch_count);
+  printf("DEBUG: 1. target_patches_X: %lu, target_patches_Y: %lu, "
+         "m_target_patches: %lu\n",
+         target_patches_X, target_patches_Y, m_target_patches);
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
+  printf("DEBUG: 2. patch_radius_x: %f, patch_radius_y: %f\n", patch_radius_x,
+         patch_radius_y);
 
   const size_t THREADS = 256;
-  const size_t NM_BLOCKS = (m_target_patches + THREADS - 1) / 256;
+  const size_t NM_BLOCKS =
+      (m_target_patches * patch_count + THREADS - 1) / THREADS;
+  printf("DEBUG: 3. THREADS: %lu, NM_BLOCKS: %lu\n", THREADS, NM_BLOCKS);
   find_source_patches_for_target_patches<<<NM_BLOCKS, THREADS>>>(
       position_list, patch_count, patch_radius_x, patch_radius_y, target_width,
       used_patches_bitmap.data().get());
+  // DEBUG 4:
+  thrust::host_vector<uint32_t> bitmap_cpu = used_patches_bitmap;
+  printf("DEBUG: 4. used_patches_bitmap\n");
+  for (size_t m = 0; m < m_target_patches; m++) {
+    for (size_t n = 0; n < patch_count; n++) {
+      printf("%u ", bitmap_cpu[m * patch_count + n]);
+    }
+    printf("\n");
+  }
+  // END DEBUG
 
   const auto [indices, patches_per_tile, tile_index_offsets] =
       compute_indices_from_bitmap(used_patches_bitmap, m_target_patches,
