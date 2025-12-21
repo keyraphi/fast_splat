@@ -310,9 +310,8 @@ __global__ void fast_splat_2d_kernel(
     }
     uint32_t idx_in_result = y_in_result * target_width * 3 + x_in_result * 3;
 
-    if (threadIdx.x == 0) {
-      printf("tile rgb: (%f, %f, %f)", tile[idx_in_tile], tile[idx_in_tile + 1],
-             tile[idx_in_tile + 2]);
+    if (tile[idx_in_tile] > 0) {
+      printf("nonzero tile\n");
     }
     result[idx_in_result] += tile[idx_in_tile];
     result[idx_in_result + 1] += tile[idx_in_tile + 1];
