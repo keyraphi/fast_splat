@@ -45,11 +45,14 @@ void cuda_debug_print(const std::string &kernel_name) {
 __global__ void find_source_patches_for_target_patches(
     const float *__restrict__ position_list, const size_t patch_count,
     const float patch_radius_x, const float patch_radius_y,
-    const size_t target_width, uint32_t *bitmap) {
+    const size_t target_width, const size_t target_count, uint32_t *bitmap) {
 
   size_t tid = threadIdx.x + blockIdx.x * blockDim.x;
   size_t target_m = tid / patch_count;
   size_t position_n = tid % patch_count;
+  if (position_n >= patch_count || target_m >= target_count) {
+    return;
+  }
 
   size_t patches_per_row = (target_width + N_THREADS_X - 1) / N_THREADS_X;
   size_t target_patch_y = target_m / patches_per_row;
@@ -62,7 +65,7 @@ __global__ void find_source_patches_for_target_patches(
   float pos_x = position_list[position_n * 2];
   float pos_y = position_list[position_n * 2 + 1];
 
-  uint8_t is_in_m = 0;
+  uint32_t is_in_m = 0;
 
   // Calculate extended influence area for bilinear interpolation
   float source_left = pos_x - ceilf(patch_radius_x);
@@ -325,7 +328,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       (m_target_patches * patch_count + THREADS - 1) / THREADS;
   printf("DEBUG: 3. THREADS: %lu, NM_BLOCKS: %lu\n", THREADS, NM_BLOCKS);
   find_source_patches_for_target_patches<<<NM_BLOCKS, THREADS>>>(
-      position_list, patch_count, patch_radius_x, patch_radius_y, target_width,
+      position_list, patch_count, patch_radius_x, patch_radius_y, target_width, m_target_patches,
       used_patches_bitmap.data().get());
   // DEBUG 4:
   thrust::host_vector<uint32_t> bitmap_cpu = used_patches_bitmap;
