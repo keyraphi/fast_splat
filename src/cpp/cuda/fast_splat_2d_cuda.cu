@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
@@ -243,7 +244,7 @@ __global__ void fast_splat_2d_kernel(
   float patch_radius_y = patch_height / 2.F;
 
   // initialize a tile of shared memory with zeros (neutral element for
-  // addition)
+  // addition in the end)
   __shared__ float tile[N_THREADS_X * N_THREADS_Y * 3];
   for (uint32_t idx_in_tile = threadIdx.x;
        idx_in_tile < N_THREADS_X * N_THREADS_Y * 3; idx_in_tile += blockDim.x) {
@@ -251,7 +252,7 @@ __global__ void fast_splat_2d_kernel(
   }
   __syncthreads();
 
-  // iterate over patches that need to be splatet into this tile
+  // iterate over all patches that need to be splatet into this tile
   uint32_t patches_for_this_tile = patches_per_tile[tile_id];
   uint32_t tile_index_offsets_for_this_tile = tile_index_offsets[tile_id];
   for (uint32_t i = 0; i < patches_for_this_tile; i++) {
@@ -314,6 +315,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   size_t m_target_patches = target_patches_X * target_patches_Y;
   thrust::device_vector<uint32_t> used_patches_bitmap(m_target_patches *
                                                       patch_count);
+  fflush(stdout);
   printf("DEBUG: 1. target_patches_X: %lu, target_patches_Y: %lu, "
          "m_target_patches: %lu\n",
          target_patches_X, target_patches_Y, m_target_patches);
@@ -350,4 +352,6 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       patch_list, patch_width, patch_height, patch_count, position_list,
       indices.data().get(), patches_per_tile.data().get(),
       tile_index_offsets.data().get(), result, target_width, target_height);
+
+  fflush(stdout);
 }
