@@ -1,4 +1,5 @@
 #include "fast_splat_2d_cuda.h"
+#include <__clang_cuda_builtin_vars.h>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -183,6 +184,9 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
   const int right = left + 1;
   const int top = y_in_tile;
   const int bottom = top + 1;
+  if (threadIdx.x == 0) {
+    printf("bilinear_splat (%d, %d, %d, %d)\n", left, right, top, bottom);
+  }
 
   if (left >= 0 && left < N_THREADS_X) {
     const float weight_left = static_cast<float>(right) - x_in_tile;
@@ -302,8 +306,8 @@ __global__ void fast_splat_2d_kernel(
     uint32_t x_in_tile = idx_in_tile % N_THREADS_X;
     uint32_t x_in_result = tile_x_px + x_in_tile;
     uint32_t y_in_result = tile_y_px + y_in_tile;
-    if (threadIdx.x == 0) {
-      printf("writeout: in tile: (%u, %u), in result (%u, %u)\n", x_in_tile, y_in_tile, x_in_result, y_in_result);
+    if (tile_id == 15) {
+      printf("tile: (%u, %u): %f\n", x_in_tile, y_in_tile, tile[idx_in_tile]);
     }
     if (x_in_result >= target_width || y_in_result >= target_height) {
       continue;
