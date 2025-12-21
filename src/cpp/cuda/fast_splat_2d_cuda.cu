@@ -104,6 +104,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
   thrust::host_vector<uint32_t> prefix_sums_cpu = prefix_sum;
   printf("DEBUG: 5. prefix_sums\n");
   for (size_t m = 0; m < rows; m++) {
+    printf("%u: ", m);
     for (size_t n = 0; n < columns; n++) {
       printf("%u ", prefix_sums_cpu[m * columns + n]);
     }
@@ -121,7 +122,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
   thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
   printf("DEBUG: 6. row_sums\n");
   for (size_t m = 0; m < rows; m++) {
-    printf("%u ", row_sums_cpu[m]);
+    printf("%u: %u ", m, row_sums_cpu[m]);
     printf("\n");
   }
   // END DEBUG
@@ -133,7 +134,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
   thrust::host_vector<uint32_t> row_offsets_cpu = row_offsets;
   printf("DEBUG: 7. row_offsets\n");
   for (size_t m = 0; m < rows; m++) {
-    printf("%u ", row_offsets_cpu[m]);
+    printf("%u: %u ", m, row_offsets_cpu[m]);
     printf("\n");
   }
   // END DEBUG
@@ -160,6 +161,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
   printf("DEBUG: 8. result\n");
   size_t i = 0;
   for (size_t m = 0; m < rows; m++) {
+    print("%u: ", m);
     for (size_t n = 0; n < row_sums_cpu[m]; n++, i++) {
       printf("%u ", result_cpu[i]);
     }
@@ -317,6 +319,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   printf("DEBUG: 2. patch_radius_x: %f, patch_radius_y: %f\n", patch_radius_x,
          patch_radius_y);
 
+  // one thread for every Patch*Target_patch
   const size_t THREADS = 256;
   const size_t NM_BLOCKS =
       (m_target_patches * patch_count + THREADS - 1) / THREADS;
