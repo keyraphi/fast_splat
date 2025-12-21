@@ -283,9 +283,6 @@ __global__ void fast_splat_2d_kernel(
       float src_blue = patch_list[patch_idx * patch_width * patch_height * 3 +
                                   idx_in_patch * 3 + 2];
 
-      if (threadIdx.x == 0) {
-        printf("rgb: (%f, %f, %f)\n", src_red, src_green, src_blue);
-      }
       uint32_t x_in_patch = idx_in_patch % patch_width;
       uint32_t y_in_patch = idx_in_patch % patch_height;
       float x_in_tile = x_in_patch + patch_left_in_tile;
@@ -305,6 +302,9 @@ __global__ void fast_splat_2d_kernel(
     uint32_t x_in_tile = idx_in_tile % N_THREADS_X;
     uint32_t x_in_result = tile_x_px + x_in_tile;
     uint32_t y_in_result = tile_y_px + y_in_tile;
+    if (threadIdx.x == 0) {
+      printf("writeout: in tile: (%u, %u), in result (%u, %u)\n", x_in_tile, y_in_tile, x_in_result, y_in_result);
+    }
     if (x_in_result >= target_width || y_in_result >= target_height) {
       continue;
     }
