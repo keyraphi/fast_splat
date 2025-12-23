@@ -255,23 +255,23 @@ __global__ void fast_splat_2d_kernel(
   uint32_t patches_for_this_tile = patches_per_tile[tile_id];
   uint32_t tile_index_offsets_for_this_tile = tile_index_offsets[tile_id];
   for (uint32_t i = 0; i < patches_for_this_tile; i++) {
-    uint32_t patch_idx = indices[tile_index_offsets_for_this_tile + i];
-    float patch_center_pos_x = position_list[patch_idx * 2];
-    float patch_center_pos_y = position_list[patch_idx * 2 + 1];
+    uint32_t patch_id = indices[tile_index_offsets_for_this_tile + i];
+    float patch_center_pos_x = position_list[patch_id * 2];
+    float patch_center_pos_y = position_list[patch_id * 2 + 1];
     float patch_left = patch_center_pos_x - patch_radius_x;
     float patch_top = patch_center_pos_y - patch_radius_y;
     float patch_left_in_tile = patch_left - tile_x_px;
     float patch_top_in_tile = patch_top - tile_y_px;
 
-    // add the pixels of this patch to this tile at the correct positions using
-    // bilinear interpolation
+    // attomicly add the pixels of this patch to this tile at the correct
+    // positions using bilinear interpolation
     for (uint32_t idx_in_patch = 0; idx_in_patch < patch_height * patch_width;
          idx_in_patch += blockDim.x) {
-      float src_red = patch_list[patch_idx * patch_width * patch_height * 3 +
+      float src_red = patch_list[patch_id * patch_width * patch_height * 3 +
                                  idx_in_patch * 3];
-      float src_green = patch_list[patch_idx * patch_width * patch_height * 3 +
+      float src_green = patch_list[patch_id * patch_width * patch_height * 3 +
                                    idx_in_patch * 3 + 1];
-      float src_blue = patch_list[patch_idx * patch_width * patch_height * 3 +
+      float src_blue = patch_list[patch_id * patch_width * patch_height * 3 +
                                   idx_in_patch * 3 + 2];
 
       uint32_t x_in_patch = idx_in_patch % patch_width;
@@ -282,27 +282,29 @@ __global__ void fast_splat_2d_kernel(
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < N_THREADS_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
+        if (threadIdx.x == 0) {
+          printf("TILE_ID: %u, patch_idx: %u\n", tile_id, patch_id);
+        }
       }
     }
   }
   __syncthreads();
   // DEBUG
-  if(threadIdx.x == 0 && tile_id == 15) {
-    printf("blubb\n");
-    // for(int i= 0; i < 10; i++) {
-    //   for(int j =0; j < 10; j++) {
-    //     printf("(");
-    //     for(int c = 0; c < 3; c++) {
-    //       int id = i * N_THREADS_X * 3 + j * 3 + c;
-    //       printf("%f ", tile[id]);
-    //     }
-    //     printf(") ");
-    //   }
-    //   printf("\n");
-    // }
+  if (threadIdx.x == 0 && tile_id == 15) {
+    for (int i = 0; i < 10; i++) {
+      for (int j = 0; j < 10; j++) {
+        printf("(");
+        for (int c = 0; c < 3; c++) {
+          int id = i * N_THREADS_X * 3 + j * 3 + c;
+          printf("%f ", tile[id]);
+        }
+        printf(") ");
+      }
+      printf("\n");
+    }
   }
   // END DEBUG
-  
+
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   for (uint32_t idx_in_tile = threadIdx.x;
        idx_in_tile < N_THREADS_X * N_THREADS_Y; idx_in_tile += blockDim.x) {
