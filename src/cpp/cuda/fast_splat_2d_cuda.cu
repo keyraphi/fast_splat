@@ -289,9 +289,9 @@ __global__ void fast_splat_2d_kernel(
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < N_THREADS_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
-        if(threadIdx.x == 0) {
-          printf("tile[%f]: %f\n", floorf(x_in_tile), tile[int(floorf(x_in_tile))]);
-        }
+        // if(threadIdx.x == 0) {
+        //   printf("tile[%f]: %f\n", floorf(x_in_tile), tile[int(floorf(x_in_tile))]);
+        // }
       }
     }
   }
