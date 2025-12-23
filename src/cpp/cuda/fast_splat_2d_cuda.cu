@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cub/util_type.cuh>
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 #include <driver_types.h>
@@ -281,15 +282,25 @@ __global__ void fast_splat_2d_kernel(
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < N_THREADS_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
-        if (threadIdx.x == 0 && idx_in_patch == 0) {
-          printf("bilinear_splat(%f, %f, %f, %f, %f, tile)\n", src_red,
-                 src_green, src_blue, x_in_tile, y_in_tile);
-          printf("tile[%f]: %f\n", ceilf(x_in_tile)*3+ceilf(y_in_tile)*N_THREADS_X*3,
-                 tile[int(ceilf(x_in_tile)*3+ceilf(y_in_tile)*N_THREADS_X*3)]);
-        }
       }
     }
   }
+  __syncthreads();
+  // DEBUG
+  if(threadIdx.x == 0 && tile_id == 15) {
+    for(int i= 0; i < N_THREADS_X; i++) {
+      for(int j =0; j < N_THREADS_Y; j++) {
+        printf("(");
+        for(int c = 0; c < 3; c++) {
+          int id = i * N_THREADS_X * 3 + j * 3 + c;
+          printf("%f ", tile[id]);
+        }
+        printf(") ");
+      }
+      printf("\n");
+    }
+  }
+  // END DEBUG
   __syncthreads();
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   for (uint32_t idx_in_tile = threadIdx.x;
