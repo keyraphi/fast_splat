@@ -122,15 +122,16 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
                         row_sums.begin());
 
   // DEBUG 6:
-  // thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
-  // printf("DEBUG: 6. row_sums\n");
-  // for (size_t m = 0; m < rows; m++) {
-  //   printf("%lu: %u ", m, row_sums_cpu[m]);
-  //   printf("\n");
-  // }
-  // END DEBUG
-  // start of each row
-  thrust::device_vector<uint32_t> row_offsets(rows);
+  thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
+  printf("DEBUG: 6. row_sums\n");
+  for (size_t m = 0; m < rows; m++) {
+    printf("%lu: %u ", m, row_sums_cpu[m]);
+  }
+  printf("\n");
+  END DEBUG
+      // start of each row
+      thrust::device_vector<uint32_t>
+          row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
 
   // DEBUG 7:
@@ -325,7 +326,8 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
          target_patches_X, target_patches_Y, m_target_patches, patch_count);
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
-  // printf("DEBUG: 2. patch_radius_x: %f, patch_radius_y: %f\n", patch_radius_x,
+  // printf("DEBUG: 2. patch_radius_x: %f, patch_radius_y: %f\n",
+  // patch_radius_x,
   //        patch_radius_y);
 
   // one thread for every Patch*Target_patch
