@@ -281,8 +281,11 @@ __global__ void fast_splat_2d_kernel(
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < N_THREADS_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
-        if(threadIdx.x == 0 && idx_in_patch == 0) {
-          printf("tile[%f]: %f\n", floorf(x_in_tile), tile[int(floorf(x_in_tile))]);
+        if (threadIdx.x == 0 && idx_in_patch == 0) {
+          printf("bilinear_splat(%f, %f, %f, %f, %f, tile)\n", src_red,
+                 src_green, src_blue, x_in_tile, y_in_tile);
+          printf("tile[%f]: %f\n", floorf(x_in_tile),
+                 tile[int(floorf(x_in_tile))]);
         }
       }
     }
@@ -296,7 +299,8 @@ __global__ void fast_splat_2d_kernel(
     uint32_t x_in_result = tile_x_px + x_in_tile;
     uint32_t y_in_result = tile_y_px + y_in_tile;
     // if (tile_id == 15) {
-    //   printf("tile: (%u, %u): %f\n", x_in_tile, y_in_tile, tile[idx_in_tile]);
+    //   printf("tile: (%u, %u): %f\n", x_in_tile, y_in_tile,
+    //   tile[idx_in_tile]);
     // }
     if (x_in_result >= target_width || y_in_result >= target_height) {
       continue;
