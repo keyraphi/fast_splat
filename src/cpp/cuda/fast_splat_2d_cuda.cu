@@ -286,7 +286,7 @@ __global__ void fast_splat_2d_kernel(
       uint32_t y_in_patch = idx_in_patch / patch_width;
       float x_in_tile = x_in_patch + patch_left_in_tile;
       float y_in_tile = y_in_patch + patch_top_in_tile;
-      if (tile_id == 390 && threadIdx.x == 0 && i == 0, idx_in_patch == 0) {
+      if (tile_id == 390 && threadIdx.x == 0 && i == 0 && idx_in_patch == 0) {
         printf("x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
       }
       if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < TILE_SIZE_X &&
