@@ -1,4 +1,5 @@
 #include "fast_splat_2d_cuda.h"
+#include <__clang_cuda_builtin_vars.h>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -265,7 +266,7 @@ __global__ void fast_splat_2d_kernel(
 
     // attomicly add the pixels of this patch to this tile at the correct
     // positions using bilinear interpolation
-    for (uint32_t idx_in_patch = 0; idx_in_patch < patch_height * patch_width;
+    for (uint32_t idx_in_patch = threadIdx.x; idx_in_patch < patch_height * patch_width;
          idx_in_patch += blockDim.x) {
       float src_red = patch_list[patch_id * patch_width * patch_height * 3 +
                                  idx_in_patch * 3];
