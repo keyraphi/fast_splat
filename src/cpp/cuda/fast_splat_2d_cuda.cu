@@ -3,10 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
-#include <curand_mtgp32.h>
 #include <driver_types.h>
 #include <string>
 #include <sys/types.h>
@@ -183,9 +181,6 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
   const int right = left + 1;
   const int top = y_in_tile;
   const int bottom = top + 1;
-  if (threadIdx.x == 0) {
-    printf("bilinear_splat (%d, %d, %d, %d)\n", left, right, top, bottom);
-  }
 
   if (left >= 0 && left < N_THREADS_X) {
     const float weight_left = static_cast<float>(right) - x_in_tile;
@@ -294,6 +289,9 @@ __global__ void fast_splat_2d_kernel(
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < N_THREADS_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
+        if(threadIdx.x == 0) {
+          printf("tile[%f]: %f\n", floorf(x_in_tile), tile[int(floorf(x_in_tile))]);
+        }
       }
     }
   }
