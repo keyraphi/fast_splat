@@ -266,6 +266,10 @@ __global__ void fast_splat_2d_kernel(
     float patch_left_in_tile = patch_left - tile_x_px;
     float patch_top_in_tile = patch_top - tile_y_px;
 
+    if (tile_id == 390 && threadIdx.x == 0 && i == 0) {
+      printf("patch_id: %u, patch_center_pos_x: %f, patch_center_pos_y: %f\n",
+             patch_id, patch_center_pos_x, patch_center_pos_y);
+    }
     // attomicly add the pixels of this patch to this tile at the correct
     // positions using bilinear interpolation
     for (uint32_t idx_in_patch = threadIdx.x;
@@ -291,10 +295,10 @@ __global__ void fast_splat_2d_kernel(
   }
   __syncthreads();
   if (tile_id == 390 && threadIdx.x == 0) {
-    for (int i = 0; i <3; i++) {
-      for (int j = 0; j < 3; j++){
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
         for (int c = 0; c < 3; c++) {
-          int id = c + j*3 + i * 3 * TILE_SIZE_X;
+          int id = c + j * 3 + i * 3 * TILE_SIZE_X;
           printf("%f ", tile[id]);
         }
       }
