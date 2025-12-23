@@ -190,16 +190,16 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       const float weight = weight_left * weight_top;
       uint32_t tile_idx = left * 3 + top * N_THREADS_X * 3;
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_red * weight);
-      atomicAdd(tile + tile_idx + 2, src_red * weight);
+      atomicAdd(tile + tile_idx + 1, src_green * weight);
+      atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
     if (bottom >= 0 && bottom < N_THREADS_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_left * weight_bottom;
       uint32_t tile_idx = left * 3 + bottom * N_THREADS_X * 3;
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_red * weight);
-      atomicAdd(tile + tile_idx + 2, src_red * weight);
+      atomicAdd(tile + tile_idx + 1, src_green * weight);
+      atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
   }
   if (right >= 0 && right < N_THREADS_X) {
@@ -209,16 +209,16 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       const float weight = weight_right * weight_top;
       uint32_t tile_idx = right * 3 + top * N_THREADS_X * 3;
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_red * weight);
-      atomicAdd(tile + tile_idx + 2, src_red * weight);
+      atomicAdd(tile + tile_idx + 1, src_green * weight);
+      atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
     if (bottom >= 0 && bottom < N_THREADS_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_right * weight_bottom;
       uint32_t tile_idx = right * 3 + bottom * N_THREADS_X * 3;
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_red * weight);
-      atomicAdd(tile + tile_idx + 2, src_red * weight);
+      atomicAdd(tile + tile_idx + 1, src_green * weight);
+      atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
   }
 }
@@ -244,6 +244,8 @@ __global__ void fast_splat_2d_kernel(
 
   // initialize a tile of shared memory with zeros (neutral element for
   // addition in the end)
+  // TODO: Tiles have to overlap by 1 pixel to prevent energy loss at tile
+  // boundaries (when position is just outside tiel)
   __shared__ float tile[N_THREADS_X * N_THREADS_Y * 3];
   for (uint32_t idx_in_tile = threadIdx.x;
        idx_in_tile < N_THREADS_X * N_THREADS_Y * 3; idx_in_tile += blockDim.x) {
@@ -284,6 +286,10 @@ __global__ void fast_splat_2d_kernel(
                        tile);
         if (threadIdx.x == 0) {
           printf("TILE_ID: %u, patch_idx: %u\n", tile_id, patch_id);
+          uint32_t tile_idx =
+              int(x_in_tile) * 3 + int(y_in_tile) * N_THREADS_X * 3;
+          printf("tile[%u]: (%f, %f, %f)\n", tile_idx, tile[tile_idx],
+                 tile[tile_idx + 1], tile[tile_idx + 2]);
         }
       }
     }
