@@ -285,6 +285,7 @@ __global__ void fast_splat_2d_kernel(
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
         if (threadIdx.x == 0) {
+          __syncthreads();
           printf("TILE_ID: %u, patch_idx: %u\n", tile_id, patch_id);
           printf("x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
           uint32_t tile_idx =
