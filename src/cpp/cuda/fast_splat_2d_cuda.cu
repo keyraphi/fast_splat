@@ -18,8 +18,8 @@
 #include <thrust/scan.h>
 #include <tuple>
 
-#define N_THREADS_X 64
-#define N_THREADS_Y 64
+#define TILE_SIZE_X 64
+#define TILE_SIZE_Y 64
 
 void cuda_debug_print(const std::string &kernel_name) {
   cudaError_t err = cudaDeviceSynchronize();
@@ -32,8 +32,8 @@ void cuda_debug_print(const std::string &kernel_name) {
 }
 
 /** Finds out if the given positions in the position list (x, y) have an effect
- * on a target patch. The target patch size is defined by N_THREADS_X and
- * N_THREADS_Y. The target position is implicit from the thread id. There is one
+ * on a target patch. The target patch size is defined by TILE_SIZE_X and
+ * TILE_SIZE_Y. The target position is implicit from the thread id. There is one
  * thread for every targe patch and every position list entry. The result is a
  * bit map of shape MxN, where M is the total number of target positions and N
  * is the number of positions in the position list (patch_count). Each input
@@ -54,13 +54,13 @@ __global__ void find_source_patches_for_target_patches(
     return;
   }
 
-  size_t patches_per_row = (target_width + N_THREADS_X - 1) / N_THREADS_X;
+  size_t patches_per_row = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
   size_t target_patch_y = target_m / patches_per_row;
   size_t target_patch_x = target_m % patches_per_row;
-  auto target_x_left = static_cast<float>(target_patch_x * N_THREADS_X);
-  auto target_y_top = static_cast<float>(target_patch_y * N_THREADS_Y);
-  float target_x_right = target_x_left + N_THREADS_X;
-  float target_y_bottom = target_y_top + N_THREADS_Y;
+  auto target_x_left = static_cast<float>(target_patch_x * TILE_SIZE_X);
+  auto target_y_top = static_cast<float>(target_patch_y * TILE_SIZE_Y);
+  float target_x_right = target_x_left + TILE_SIZE_X;
+  float target_y_bottom = target_y_top + TILE_SIZE_Y;
 
   float pos_x = position_list[position_n * 2];
   float pos_y = position_list[position_n * 2 + 1];
@@ -183,39 +183,39 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
   const int top = y_in_tile;
   const int bottom = top + 1;
 
-  if (left >= 0 && left < N_THREADS_X) {
+  if (left >= 0 && left < TILE_SIZE_X) {
     const float weight_left = static_cast<float>(right) - x_in_tile;
-    if (top >= 0 && top < N_THREADS_Y) {
+    if (top >= 0 && top < TILE_SIZE_Y) {
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_left * weight_top;
-      uint32_t tile_idx = left * 3 + top * N_THREADS_X * 3;
+      uint32_t tile_idx = left * 3 + top * TILE_SIZE_X * 3;
       atomicAdd(tile + tile_idx, src_red * weight);
       atomicAdd(tile + tile_idx + 1, src_green * weight);
       atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
-    if (bottom >= 0 && bottom < N_THREADS_Y) {
+    if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_left * weight_bottom;
-      uint32_t tile_idx = left * 3 + bottom * N_THREADS_X * 3;
+      uint32_t tile_idx = left * 3 + bottom * TILE_SIZE_X * 3;
       atomicAdd(tile + tile_idx, src_red * weight);
       atomicAdd(tile + tile_idx + 1, src_green * weight);
       atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
   }
-  if (right >= 0 && right < N_THREADS_X) {
+  if (right >= 0 && right < TILE_SIZE_X) {
     const float weight_right = x_in_tile - static_cast<float>(left);
-    if (top >= 0 && top < N_THREADS_Y) {
+    if (top >= 0 && top < TILE_SIZE_Y) {
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_right * weight_top;
-      uint32_t tile_idx = right * 3 + top * N_THREADS_X * 3;
+      uint32_t tile_idx = right * 3 + top * TILE_SIZE_X * 3;
       atomicAdd(tile + tile_idx, src_red * weight);
       atomicAdd(tile + tile_idx + 1, src_green * weight);
       atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
-    if (bottom >= 0 && bottom < N_THREADS_Y) {
+    if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_right * weight_bottom;
-      uint32_t tile_idx = right * 3 + bottom * N_THREADS_X * 3;
+      uint32_t tile_idx = right * 3 + bottom * TILE_SIZE_X * 3;
       atomicAdd(tile + tile_idx, src_red * weight);
       atomicAdd(tile + tile_idx + 1, src_green * weight);
       atomicAdd(tile + tile_idx + 2, src_blue * weight);
@@ -232,23 +232,21 @@ __global__ void fast_splat_2d_kernel(
     const size_t target_height) {
   uint32_t tile_id = blockIdx.x;
 
-  uint32_t tiles_per_width = target_width / N_THREADS_X;
+  uint32_t tiles_per_width = target_width / TILE_SIZE_X;
   uint32_t tile_x = tile_id % tiles_per_width;
   uint32_t tile_y = tile_id / tiles_per_width;
 
-  uint32_t tile_x_px = tile_x * N_THREADS_X;
-  uint32_t tile_y_px = tile_y * N_THREADS_X;
+  uint32_t tile_x_px = tile_x * TILE_SIZE_X;
+  uint32_t tile_y_px = tile_y * TILE_SIZE_Y;
 
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
 
   // initialize a tile of shared memory with zeros (neutral element for
   // addition in the end)
-  // TODO: Tiles have to overlap by 1 pixel to prevent energy loss at tile
-  // boundaries (when position is just outside tiel)
-  __shared__ float tile[N_THREADS_X * N_THREADS_Y * 3];
+  __shared__ float tile[TILE_SIZE_X * TILE_SIZE_Y * 3];
   for (uint32_t idx_in_tile = threadIdx.x;
-       idx_in_tile < N_THREADS_X * N_THREADS_Y * 3; idx_in_tile += blockDim.x) {
+       idx_in_tile < TILE_SIZE_X * TILE_SIZE_Y * 3; idx_in_tile += blockDim.x) {
     tile[idx_in_tile] = 0.f;
   }
   __syncthreads();
@@ -280,15 +278,15 @@ __global__ void fast_splat_2d_kernel(
       uint32_t y_in_patch = idx_in_patch / patch_width;
       float x_in_tile = x_in_patch + patch_left_in_tile;
       float y_in_tile = y_in_patch + patch_top_in_tile;
-      if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < N_THREADS_X &&
-          ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < N_THREADS_Y) {
+      if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < TILE_SIZE_X &&
+          ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < TILE_SIZE_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
         if (threadIdx.x == 0) {
           printf("TILE_ID: %u, patch_idx: %u\n", tile_id, patch_id);
           printf("x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
           uint32_t tile_idx =
-              int(x_in_tile) * 3 + int(y_in_tile) * N_THREADS_X * 3;
+              int(x_in_tile) * 3 + int(y_in_tile) * TILE_SIZE_X * 3;
           printf("tile[%u]: (%f, %f, %f)\n", tile_idx, tile[tile_idx],
                  tile[tile_idx + 1], tile[tile_idx + 2]);
         }
@@ -298,10 +296,10 @@ __global__ void fast_splat_2d_kernel(
   __syncthreads();
   // DEBUG
   if (threadIdx.x == 0 && tile_id == 15) {
-    for (int i = 0; i < N_THREADS_X; i++) {
-      for (int j = 0; j < N_THREADS_Y; j++) {
+    for (int i = 0; i < TILE_SIZE_X; i++) {
+      for (int j = 0; j < TILE_SIZE_Y; j++) {
         for (int c = 0; c < 3; c++) {
-          int id = i * N_THREADS_X * 3 + j * 3 + c;
+          int id = i * TILE_SIZE_X * 3 + j * 3 + c;
           if (tile[id] > 0) {
             printf("%d -> %f \n", id, tile[id]);
           }
@@ -313,9 +311,9 @@ __global__ void fast_splat_2d_kernel(
 
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   for (uint32_t idx_in_tile = threadIdx.x;
-       idx_in_tile < N_THREADS_X * N_THREADS_Y; idx_in_tile += blockDim.x) {
-    uint32_t y_in_tile = idx_in_tile / N_THREADS_X;
-    uint32_t x_in_tile = idx_in_tile % N_THREADS_X;
+       idx_in_tile < TILE_SIZE_X * TILE_SIZE_Y; idx_in_tile += blockDim.x) {
+    uint32_t y_in_tile = idx_in_tile / TILE_SIZE_X;
+    uint32_t x_in_tile = idx_in_tile % TILE_SIZE_X;
     uint32_t x_in_result = tile_x_px + x_in_tile;
     uint32_t y_in_result = tile_y_px + y_in_tile;
     // if (tile_id == 15) {
@@ -343,8 +341,8 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
                         const size_t patch_height, float *__restrict__ result,
                         const size_t target_width, const size_t target_height) {
   // Determine how many target patches there will be
-  size_t target_patches_X = (target_width + N_THREADS_X - 1) / N_THREADS_X;
-  size_t target_patches_Y = (target_height + N_THREADS_Y - 1) / N_THREADS_Y;
+  size_t target_patches_X = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
+  size_t target_patches_Y = (target_height + TILE_SIZE_Y - 1) / TILE_SIZE_Y;
   size_t m_target_patches = target_patches_X * target_patches_Y;
   thrust::device_vector<uint32_t> used_patches_bitmap(m_target_patches *
                                                       patch_count);
