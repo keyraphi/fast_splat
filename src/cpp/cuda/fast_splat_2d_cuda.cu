@@ -319,10 +319,10 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   size_t m_target_patches = target_patches_X * target_patches_Y;
   thrust::device_vector<uint32_t> used_patches_bitmap(m_target_patches *
                                                       patch_count);
-  // fflush(stdout);
-  // printf("DEBUG: 1. target_patches_X: %lu, target_patches_Y: %lu, "
-  //        "m_target_patches: %lu\n",
-  //        target_patches_X, target_patches_Y, m_target_patches);
+  fflush(stdout);
+  printf("DEBUG: 1. target_patches_X: %lu, target_patches_Y: %lu, "
+         "m_target_patches: %lu\n",
+         target_patches_X, target_patches_Y, m_target_patches);
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
   // printf("DEBUG: 2. patch_radius_x: %f, patch_radius_y: %f\n", patch_radius_x,
