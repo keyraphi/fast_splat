@@ -252,9 +252,9 @@ __global__ void fast_splat_2d_kernel(
 
   // iterate over all patches that need to be splatet into this tile
   uint32_t patches_for_this_tile = patches_per_tile[tile_id];
-  if (threadIdx.x == 0) {
-    printf("patches_per_tile[%u]: %u\n", tile_id, patches_for_this_tile);
-  }
+  // if (threadIdx.x == 0) {
+  //   printf("patches_per_tile[%u]: %u\n", tile_id, patches_for_this_tile);
+  // }
   uint32_t tile_index_offsets_for_this_tile = tile_index_offsets[tile_id];
   for (uint32_t i = 0; i < patches_for_this_tile; i++) {
     uint32_t patch_idx = indices[tile_index_offsets_for_this_tile + i];
@@ -264,11 +264,11 @@ __global__ void fast_splat_2d_kernel(
     float patch_top = patch_center_pos_y - patch_radius_y;
     float patch_left_in_tile = patch_left - tile_x_px;
     float patch_top_in_tile = patch_top - tile_y_px;
-    if (threadIdx.x == 0) {
-      printf("patch center: (%f, %f),  top left: (%f, %f), tile pos: (%u, %u), in tile: (%f, %f)\n",
-             patch_center_pos_x, patch_center_pos_y, patch_left, patch_top,
-             tile_x_px, tile_y_px, patch_left_in_tile, patch_top_in_tile);
-    }
+    // if (threadIdx.x == 0) {
+    //   printf("patch center: (%f, %f),  top left: (%f, %f), tile pos: (%u, %u), in tile: (%f, %f)\n",
+    //          patch_center_pos_x, patch_center_pos_y, patch_left, patch_top,
+    //          tile_x_px, tile_y_px, patch_left_in_tile, patch_top_in_tile);
+    // }
 
     // add the pixels of this patch to this tile at the correct positions using
     // bilinear interpolation
@@ -303,17 +303,17 @@ __global__ void fast_splat_2d_kernel(
     uint32_t x_in_tile = idx_in_tile % N_THREADS_X;
     uint32_t x_in_result = tile_x_px + x_in_tile;
     uint32_t y_in_result = tile_y_px + y_in_tile;
-    if (tile_id == 15) {
-      printf("tile: (%u, %u): %f\n", x_in_tile, y_in_tile, tile[idx_in_tile]);
-    }
+    // if (tile_id == 15) {
+    //   printf("tile: (%u, %u): %f\n", x_in_tile, y_in_tile, tile[idx_in_tile]);
+    // }
     if (x_in_result >= target_width || y_in_result >= target_height) {
       continue;
     }
     uint32_t idx_in_result = y_in_result * target_width * 3 + x_in_result * 3;
 
-    if (tile[idx_in_tile] > 0) {
-      printf("nonzero tile\n");
-    }
+    // if (tile[idx_in_tile] > 0) {
+    //   printf("nonzero tile\n");
+    // }
     result[idx_in_result] += tile[idx_in_tile];
     result[idx_in_result + 1] += tile[idx_in_tile + 1];
     result[idx_in_result + 2] += tile[idx_in_tile + 2];
