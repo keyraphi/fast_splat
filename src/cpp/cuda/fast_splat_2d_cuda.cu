@@ -288,20 +288,21 @@ __global__ void fast_splat_2d_kernel(
   __syncthreads();
   // DEBUG
   if(threadIdx.x == 0 && tile_id == 15) {
-    for(int i= 0; i < 10; i++) {
-      for(int j =0; j < 10; j++) {
-        printf("(");
-        for(int c = 0; c < 3; c++) {
-          int id = i * N_THREADS_X * 3 + j * 3 + c;
-          printf("%f ", tile[id]);
-        }
-        printf(") ");
-      }
-      printf("\n");
-    }
+    printf("blubb\n");
+    // for(int i= 0; i < 10; i++) {
+    //   for(int j =0; j < 10; j++) {
+    //     printf("(");
+    //     for(int c = 0; c < 3; c++) {
+    //       int id = i * N_THREADS_X * 3 + j * 3 + c;
+    //       printf("%f ", tile[id]);
+    //     }
+    //     printf(") ");
+    //   }
+    //   printf("\n");
+    // }
   }
   // END DEBUG
-  __syncthreads();
+  
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   for (uint32_t idx_in_tile = threadIdx.x;
        idx_in_tile < N_THREADS_X * N_THREADS_Y; idx_in_tile += blockDim.x) {
