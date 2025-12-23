@@ -282,7 +282,7 @@ __global__ void fast_splat_2d_kernel(
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < TILE_SIZE_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
-        if (threadIdx.x < 5) {
+        if (threadIdx.x < 3) {
           printf("TILE_ID: %u, patch_idx: %u\n", tile_id, patch_id);
           printf("threadIdx.x: %u\n", threadIdx.x);
           printf("x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
