@@ -286,6 +286,9 @@ __global__ void fast_splat_2d_kernel(
       uint32_t y_in_patch = idx_in_patch / patch_width;
       float x_in_tile = x_in_patch + patch_left_in_tile;
       float y_in_tile = y_in_patch + patch_top_in_tile;
+      if (tile_id == 390 && threadIdx.x == 0 && i == 0, idx_in_patch == 0) {
+        printf("x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
+      }
       if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < TILE_SIZE_X &&
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < TILE_SIZE_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
@@ -339,8 +342,10 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
                                                       patch_count);
   fflush(stdout);
   printf("DEBUG: 1. target_patches_X: %lu, target_patches_Y: %lu, "
-         "m_target_patches: %lu, patch_count: %lu, target_width: %lu, target_height: %lu\n",
-         target_patches_X, target_patches_Y, m_target_patches, patch_count, target_width, target_height);
+         "m_target_patches: %lu, patch_count: %lu, target_width: %lu, "
+         "target_height: %lu\n",
+         target_patches_X, target_patches_Y, m_target_patches, patch_count,
+         target_width, target_height);
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
   // printf("DEBUG: 2. patch_radius_x: %f, patch_radius_y: %f\n",
