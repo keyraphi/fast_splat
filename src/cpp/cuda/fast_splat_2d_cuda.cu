@@ -265,7 +265,8 @@ __global__ void fast_splat_2d_kernel(
 
     // attomicly add the pixels of this patch to this tile at the correct
     // positions using bilinear interpolation
-    for (uint32_t idx_in_patch = threadIdx.x; idx_in_patch < patch_height * patch_width;
+    for (uint32_t idx_in_patch = threadIdx.x;
+         idx_in_patch < patch_height * patch_width;
          idx_in_patch += blockDim.x) {
       float src_red = patch_list[patch_id * patch_width * patch_height * 3 +
                                  idx_in_patch * 3];
@@ -282,15 +283,6 @@ __global__ void fast_splat_2d_kernel(
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < TILE_SIZE_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
-        if (threadIdx.x < 3) {
-          printf("TILE_ID: %u, patch_idx: %u\n", tile_id, patch_id);
-          printf("threadIdx.x: %u\n", threadIdx.x);
-          printf("x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
-          uint32_t tile_idx =
-              int(x_in_tile) * 3 + int(y_in_tile) * TILE_SIZE_X * 3;
-          printf("tile[%u]: (%f, %f, %f)\n", tile_idx, tile[tile_idx],
-                 tile[tile_idx + 1], tile[tile_idx + 2]);
-        }
       }
     }
   }
@@ -312,26 +304,20 @@ __global__ void fast_splat_2d_kernel(
 
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   for (uint32_t idx_in_tile = threadIdx.x;
-       idx_in_tile < TILE_SIZE_X * TILE_SIZE_Y; idx_in_tile += blockDim.x) {
-    uint32_t y_in_tile = idx_in_tile / TILE_SIZE_X;
-    uint32_t x_in_tile = idx_in_tile % TILE_SIZE_X;
+       idx_in_tile < TILE_SIZE_X * TILE_SIZE_Y * 3; idx_in_tile += blockDim.x) {
+    uint32_t color_idx = idx_in_tile % 3;
+    uint32_t pos_in_tile = idx_in_tile / 3;
+    uint32_t x_in_tile = pos_in_tile % TILE_SIZE_X;
+    uint32_t y_in_tile = pos_in_tile / TILE_SIZE_X;
     uint32_t x_in_result = tile_x_px + x_in_tile;
     uint32_t y_in_result = tile_y_px + y_in_tile;
-    // if (tile_id == 15) {
-    //   printf("tile: (%u, %u): %f\n", x_in_tile, y_in_tile,
-    //   tile[idx_in_tile]);
-    // }
     if (x_in_result >= target_width || y_in_result >= target_height) {
       continue;
     }
-    uint32_t idx_in_result = y_in_result * target_width * 3 + x_in_result * 3;
+    uint32_t idx_in_result =
+        y_in_result * target_width * 3 + x_in_result * 3 + color_idx;
 
-    // if (tile[idx_in_tile] > 0) {
-    //   printf("nonzero tile\n");
-    // }
     result[idx_in_result] += tile[idx_in_tile];
-    result[idx_in_result + 1] += tile[idx_in_tile + 1];
-    result[idx_in_result + 2] += tile[idx_in_tile + 2];
   }
 }
 
