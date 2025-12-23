@@ -288,8 +288,8 @@ __global__ void fast_splat_2d_kernel(
   __syncthreads();
   // DEBUG
   if(threadIdx.x == 0 && tile_id == 15) {
-    for(int i= 0; i < N_THREADS_X; i++) {
-      for(int j =0; j < N_THREADS_Y; j++) {
+    for(int i= 0; i < 10; i++) {
+      for(int j =0; j < 10; j++) {
         printf("(");
         for(int c = 0; c < 3; c++) {
           int id = i * N_THREADS_X * 3 + j * 3 + c;
