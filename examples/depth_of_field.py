@@ -200,7 +200,7 @@ def main():
         result_image = np.from_dlpack(result_image)
 
     print(f"Creating the patches took {duration_circle_creation} sec.")
-    print(f"Splatting on CPU took {duration_splatting} sec.")
+    print(f"Splatting took {duration_splatting} sec.")
 
     # Show result
     fig_img = plt.figure(figsize=(12, 6))

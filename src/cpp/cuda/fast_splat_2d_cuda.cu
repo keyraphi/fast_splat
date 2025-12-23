@@ -122,16 +122,15 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
                         row_sums.begin());
 
   // DEBUG 6:
-  thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
-  printf("DEBUG: 6. row_sums\n");
-  for (size_t m = 0; m < rows; m++) {
-    printf("%lu: %u ", m, row_sums_cpu[m]);
-  }
-  printf("\n");
+  // thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
+  // printf("DEBUG: 6. row_sums\n");
+  // for (size_t m = 0; m < rows; m++) {
+  //   printf("%lu: %u ", m, row_sums_cpu[m]);
+  // }
+  // printf("\n");
   // END DEBUG
-      // start of each row
-      thrust::device_vector<uint32_t>
-          row_offsets(rows);
+  // start of each row
+  thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
 
   // DEBUG 7:
@@ -288,6 +287,17 @@ __global__ void fast_splat_2d_kernel(
     }
   }
   __syncthreads();
+  if (tile_id == 390 && threadIdx.x == 0) {
+    for (int i = 0; i <3; i++) {
+      for (int j = 0; j < 3; j++){
+        for (int c = 0; c < 3; c++) {
+          int id = c + j*3 + i * 3 * TILE_SIZE_X;
+          printf("%f ", tile[id]);
+        }
+      }
+      printf("\n");
+    }
+  }
 
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   for (uint32_t idx_in_tile = threadIdx.x;
