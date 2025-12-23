@@ -253,6 +253,9 @@ __global__ void fast_splat_2d_kernel(
 
   // iterate over all patches that need to be splatet into this tile
   uint32_t patches_for_this_tile = patches_per_tile[tile_id];
+  if (tile_id == 390 && threadIdx.x == 0) {
+    printf("patches for tile 390: %u\n", patches_for_this_tile);
+  }
   uint32_t tile_index_offsets_for_this_tile = tile_index_offsets[tile_id];
   for (uint32_t i = 0; i < patches_for_this_tile; i++) {
     uint32_t patch_id = indices[tile_index_offsets_for_this_tile + i];
