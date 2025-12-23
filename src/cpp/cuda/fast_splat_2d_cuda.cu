@@ -104,15 +104,15 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
                                 bitmap.begin(), prefix_sum.begin());
 
   // DEBUG 5:
-  thrust::host_vector<uint32_t> prefix_sums_cpu = prefix_sum;
-  printf("DEBUG: 5. prefix_sums\n");
-  for (size_t m = 0; m < rows; m++) {
-    printf("%lu: ", m);
-    for (size_t n = 0; n < columns; n++) {
-      printf("%u ", prefix_sums_cpu[m * columns + n]);
-    }
-    printf("\n");
-  }
+  // thrust::host_vector<uint32_t> prefix_sums_cpu = prefix_sum;
+  // printf("DEBUG: 5. prefix_sums\n");
+  // for (size_t m = 0; m < rows; m++) {
+  //   printf("%lu: ", m);
+  //   for (size_t n = 0; n < columns; n++) {
+  //     printf("%u ", prefix_sums_cpu[m * columns + n]);
+  //   }
+  //   printf("\n");
+  // }
   // END DEBUG
 
   // number of entries per row
@@ -122,24 +122,24 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
                         row_sums.begin());
 
   // DEBUG 6:
-  thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
-  printf("DEBUG: 6. row_sums\n");
-  for (size_t m = 0; m < rows; m++) {
-    printf("%lu: %u ", m, row_sums_cpu[m]);
-    printf("\n");
-  }
+  // thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
+  // printf("DEBUG: 6. row_sums\n");
+  // for (size_t m = 0; m < rows; m++) {
+  //   printf("%lu: %u ", m, row_sums_cpu[m]);
+  //   printf("\n");
+  // }
   // END DEBUG
   // start of each row
   thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
 
   // DEBUG 7:
-  thrust::host_vector<uint32_t> row_offsets_cpu = row_offsets;
-  printf("DEBUG: 7. row_offsets\n");
-  for (size_t m = 0; m < rows; m++) {
-    printf("%lu: %u ", m, row_offsets_cpu[m]);
-    printf("\n");
-  }
+  // thrust::host_vector<uint32_t> row_offsets_cpu = row_offsets;
+  // printf("DEBUG: 7. row_offsets\n");
+  // for (size_t m = 0; m < rows; m++) {
+  //   printf("%lu: %u ", m, row_offsets_cpu[m]);
+  //   printf("\n");
+  // }
   // END DEBUG
 
   //  write indices of patches together
@@ -160,16 +160,16 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
                   result.begin(), // Destination
                   [] __host__ __device__(uint32_t val) { return val == 1; });
   // DEBUG 8:
-  thrust::host_vector<uint32_t> result_cpu = result;
-  printf("DEBUG: 8. result\n");
-  size_t i = 0;
-  for (size_t m = 0; m < rows; m++) {
-    printf("%lu: ", m);
-    for (size_t n = 0; n < row_sums_cpu[m]; n++, i++) {
-      printf("%u ", result_cpu[i]);
-    }
-    printf("\n");
-  }
+  // thrust::host_vector<uint32_t> result_cpu = result;
+  // printf("DEBUG: 8. result\n");
+  // size_t i = 0;
+  // for (size_t m = 0; m < rows; m++) {
+  //   printf("%lu: ", m);
+  //   for (size_t n = 0; n < row_sums_cpu[m]; n++, i++) {
+  //     printf("%u ", result_cpu[i]);
+  //   }
+  //   printf("\n");
+  // }
   // END DEBUG
 
   return {result, row_sums, row_offsets};
@@ -287,20 +287,6 @@ __global__ void fast_splat_2d_kernel(
     }
   }
   __syncthreads();
-  // DEBUG
-  if (threadIdx.x == 0 && tile_id == 15) {
-    for (int i = 0; i < TILE_SIZE_X; i++) {
-      for (int j = 0; j < TILE_SIZE_Y; j++) {
-        for (int c = 0; c < 3; c++) {
-          int id = i * TILE_SIZE_X * 3 + j * 3 + c;
-          if (tile[id] > 0) {
-            printf("%d -> %f \n", id, tile[id]);
-          }
-        }
-      }
-    }
-  }
-  // END DEBUG
 
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   for (uint32_t idx_in_tile = threadIdx.x;
@@ -333,33 +319,33 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   size_t m_target_patches = target_patches_X * target_patches_Y;
   thrust::device_vector<uint32_t> used_patches_bitmap(m_target_patches *
                                                       patch_count);
-  fflush(stdout);
-  printf("DEBUG: 1. target_patches_X: %lu, target_patches_Y: %lu, "
-         "m_target_patches: %lu\n",
-         target_patches_X, target_patches_Y, m_target_patches);
+  // fflush(stdout);
+  // printf("DEBUG: 1. target_patches_X: %lu, target_patches_Y: %lu, "
+  //        "m_target_patches: %lu\n",
+  //        target_patches_X, target_patches_Y, m_target_patches);
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
-  printf("DEBUG: 2. patch_radius_x: %f, patch_radius_y: %f\n", patch_radius_x,
-         patch_radius_y);
+  // printf("DEBUG: 2. patch_radius_x: %f, patch_radius_y: %f\n", patch_radius_x,
+  //        patch_radius_y);
 
   // one thread for every Patch*Target_patch
   const size_t THREADS = 256;
   const size_t NM_BLOCKS =
       (m_target_patches * patch_count + THREADS - 1) / THREADS;
-  printf("DEBUG: 3. THREADS: %lu, NM_BLOCKS: %lu\n", THREADS, NM_BLOCKS);
+  // printf("DEBUG: 3. THREADS: %lu, NM_BLOCKS: %lu\n", THREADS, NM_BLOCKS);
   find_source_patches_for_target_patches<<<NM_BLOCKS, THREADS>>>(
       position_list, patch_count, patch_radius_x, patch_radius_y, target_width,
       m_target_patches, used_patches_bitmap.data().get());
   // DEBUG 4:
-  thrust::host_vector<uint32_t> bitmap_cpu = used_patches_bitmap;
-  printf("DEBUG: 4. used_patches_bitmap\n");
-  for (size_t m = 0; m < m_target_patches; m++) {
-    printf("%lu: ", m);
-    for (size_t n = 0; n < patch_count; n++) {
-      printf("%u ", bitmap_cpu[m * patch_count + n]);
-    }
-    printf("\n");
-  }
+  // thrust::host_vector<uint32_t> bitmap_cpu = used_patches_bitmap;
+  // printf("DEBUG: 4. used_patches_bitmap\n");
+  // for (size_t m = 0; m < m_target_patches; m++) {
+  //   printf("%lu: ", m);
+  //   for (size_t n = 0; n < patch_count; n++) {
+  //     printf("%u ", bitmap_cpu[m * patch_count + n]);
+  //   }
+  //   printf("\n");
+  // }
   // END DEBUG
 
   const auto [indices, patches_per_tile, tile_index_offsets] =
