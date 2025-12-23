@@ -20,6 +20,8 @@ InlayHints:
   # Disables automatic insertion of missing #include statements on completion
   autoDeclaration: false
 
+header-insertion: never
+
 Diagnostics:
   ClangTidy:
     Add: 
@@ -37,4 +39,10 @@ Diagnostics:
 
 Index:
   Background: Build
+  HeaderInsertion: iwyu  # Allow it for standard C++ files
+
+If:
+  PathMatch: .*\.cu
+Index:
+  HeaderInsertion: never
   
