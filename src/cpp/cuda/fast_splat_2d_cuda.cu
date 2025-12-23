@@ -277,21 +277,21 @@ __global__ void fast_splat_2d_kernel(
                                   idx_in_patch * 3 + 2];
 
       uint32_t x_in_patch = idx_in_patch % patch_width;
-      uint32_t y_in_patch = idx_in_patch % patch_height;
+      uint32_t y_in_patch = idx_in_patch / patch_width;
       float x_in_tile = x_in_patch + patch_left_in_tile;
       float y_in_tile = y_in_patch + patch_top_in_tile;
       if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < N_THREADS_X &&
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < N_THREADS_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
-        // if (threadIdx.x == 0) {
-        //   printf("TILE_ID: %u, patch_idx: %u\n", tile_id, patch_id);
-        //   printf("x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
-        //   uint32_t tile_idx =
-        //       int(x_in_tile) * 3 + int(y_in_tile) * N_THREADS_X * 3;
-        //   printf("tile[%u]: (%f, %f, %f)\n", tile_idx, tile[tile_idx],
-        //          tile[tile_idx + 1], tile[tile_idx + 2]);
-        // }
+        if (threadIdx.x == 0) {
+          printf("TILE_ID: %u, patch_idx: %u\n", tile_id, patch_id);
+          printf("x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
+          uint32_t tile_idx =
+              int(x_in_tile) * 3 + int(y_in_tile) * N_THREADS_X * 3;
+          printf("tile[%u]: (%f, %f, %f)\n", tile_idx, tile[tile_idx],
+                 tile[tile_idx + 1], tile[tile_idx + 2]);
+        }
       }
     }
   }
