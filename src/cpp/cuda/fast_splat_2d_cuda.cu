@@ -300,14 +300,13 @@ __global__ void fast_splat_2d_kernel(
   if (threadIdx.x == 0 && tile_id == 15) {
     for (int i = 0; i < 10; i++) {
       for (int j = 0; j < 10; j++) {
-        printf("%d(", i * N_THREADS_X * 3 + j * 3);
         for (int c = 0; c < 3; c++) {
           int id = i * N_THREADS_X * 3 + j * 3 + c;
-          printf("%f ", tile[id]);
+          if (tile[id] > 0) {
+            printf("%d -> %f \n", id, tile[id]);
+          }
         }
-        printf(") ");
       }
-      printf("\n");
     }
   }
   // END DEBUG
