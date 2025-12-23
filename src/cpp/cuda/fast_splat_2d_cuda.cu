@@ -286,6 +286,7 @@ __global__ void fast_splat_2d_kernel(
                        tile);
         if (threadIdx.x == 0) {
           printf("TILE_ID: %u, patch_idx: %u\n", tile_id, patch_id);
+          printf("x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
           uint32_t tile_idx =
               int(x_in_tile) * 3 + int(y_in_tile) * N_THREADS_X * 3;
           printf("tile[%u]: (%f, %f, %f)\n", tile_idx, tile[tile_idx],
