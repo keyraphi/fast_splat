@@ -128,7 +128,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
     printf("%lu: %u ", m, row_sums_cpu[m]);
   }
   printf("\n");
-  END DEBUG
+  // END DEBUG
       // start of each row
       thrust::device_vector<uint32_t>
           row_offsets(rows);
