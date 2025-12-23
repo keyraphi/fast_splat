@@ -284,8 +284,8 @@ __global__ void fast_splat_2d_kernel(
         if (threadIdx.x == 0 && idx_in_patch == 0) {
           printf("bilinear_splat(%f, %f, %f, %f, %f, tile)\n", src_red,
                  src_green, src_blue, x_in_tile, y_in_tile);
-          printf("tile[%f]: %f\n", floorf(x_in_tile),
-                 tile[int(floorf(x_in_tile))]);
+          printf("tile[%f]: %f\n", ceilf(x_in_tile)*3+ceilf(y_in_tile)*N_THREADS_X*3,
+                 tile[int(ceilf(x_in_tile)*3+ceilf(y_in_tile)*N_THREADS_X*3)]);
         }
       }
     }
