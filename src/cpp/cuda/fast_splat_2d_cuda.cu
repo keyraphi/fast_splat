@@ -20,6 +20,7 @@
 
 #define TILE_SIZE_X 32
 #define TILE_SIZE_Y 32
+#define THREADS 1024
 
 void cuda_debug_print(const std::string &kernel_name) {
   cudaError_t err = cudaDeviceSynchronize();
@@ -285,7 +286,6 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   float patch_radius_y = patch_height / 2.F;
 
   // one thread for every Patch*Target_patch
-  const size_t THREADS = 256;
   const size_t NM_BLOCKS =
       (total_tiles * patch_count + THREADS - 1) / THREADS;
   find_source_patches_for_target_tiles<<<NM_BLOCKS, THREADS>>>(
