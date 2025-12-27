@@ -20,7 +20,6 @@
 
 #define TILE_SIZE_X 32
 #define TILE_SIZE_Y 32
-#define THREADS 1024
 
 void cuda_debug_print(const std::string &kernel_name) {
   cudaError_t err = cudaDeviceSynchronize();
@@ -286,9 +285,10 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   float patch_radius_y = patch_height / 2.F;
 
   // one thread for every Patch*Target_patch
+  const size_t THREADS_FIND_KERNEL = 256;
   const size_t NM_BLOCKS =
-      (total_tiles * patch_count + THREADS - 1) / THREADS;
-  find_source_patches_for_target_tiles<<<NM_BLOCKS, THREADS>>>(
+      (total_tiles * patch_count + THREADS_FIND_KERNEL - 1) / THREADS_FIND_KERNEL;
+  find_source_patches_for_target_tiles<<<NM_BLOCKS, THREADS_FIND_KERNEL>>>(
       position_list, patch_count, patch_radius_x, patch_radius_y, target_width,
       total_tiles, used_patches_bitmap.data().get());
 
@@ -296,7 +296,8 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       compute_indices_from_bitmap(used_patches_bitmap, total_tiles,
                                   patch_count);
 
-  fast_splat_2d_kernel<<<total_tiles, 256>>>(
+  const size_t THREADS_SPLAT_KERNEL = 1024;
+  fast_splat_2d_kernel<<<total_tiles, 1024>>>(
       patch_list, patch_width, patch_height, patch_count, position_list,
       indices.data().get(), patches_per_tile.data().get(),
       tile_index_offsets.data().get(), result, target_width, target_height);
