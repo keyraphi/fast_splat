@@ -219,7 +219,8 @@ def main():
 
     print("Writing out images")
     iio.imwrite(f"results/circles_of_confusion_fd_{args.focus_distance}_f_{args.f_number}.exr", blur_radius_px)
-    iio.imwrite(f"results/result_fd_{focus_distance}_f_{args.f_number}.exr", result_image)
+    iio.imwrite(f"results/input.png", reinhard(img*0.5))
+    iio.imwrite(f"results/result_fd_{focus_distance}_f_{args.f_number}.png", reinhard(result_image*0.5))
 
 
 if __name__ == "__main__":
