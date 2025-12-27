@@ -28,27 +28,28 @@ def create_circles_of_confusion(circle_radius_list: np.ndarray, max_blur_px: int
     patches = patches / np.sum(np.sum(patches, axis=-1), axis=-1)[:, None, None]
     return patches
 
+
 def create_circles_of_confusion_gpu(circle_radius_list: torch.Tensor, max_blur_px: int):
     device = circle_radius_list.device
     radii = circle_radius_list
-    
+
     radius_clamped = torch.maximum(radii - 0.5, torch.tensor(1e-6, device=device))
-    
+
     steps = 2 * max_blur_px + 1
     line = torch.linspace(-max_blur_px, max_blur_px, steps, device=device)
-    
-    ys, xs = torch.meshgrid(line, line, indexing='ij')
-    
+
+    ys, xs = torch.meshgrid(line, line, indexing="ij")
+
     points = torch.stack([ys, xs], dim=-1)
     dist_patch = torch.linalg.vector_norm(points, dim=-1)
-    
+
     patches = dist_patch[None, :, :] < radius_clamped[:, None, None]
     patches = patches.to(torch.float32)
-    
+
     sums = torch.sum(patches, dim=(1, 2), keepdim=True)
-    
+
     patches = patches / torch.clamp(sums, min=1e-8)
-    
+
     return patches
 
 
@@ -155,7 +156,11 @@ def main():
         blur_radius_px_list = torch.as_tensor(blur_radius_px_list, device=device)
         pixel_coordinates = torch.as_tensor(pixel_coordinates, device=device)
         pixel_list = torch.as_tensor(pixel_list, device=device)
-        result_image = torch.zeros([img.shape[0], img.shape[1], img.shape[2]], dtype=torch.float32, device=device)
+        result_image = torch.zeros(
+            [img.shape[0], img.shape[1], img.shape[2]],
+            dtype=torch.float32,
+            device=device,
+        )
         for indices in tqdm(batch_indices):
             indices = torch.as_tensor(indices, device=device)
             # create patches to splat
@@ -206,11 +211,11 @@ def main():
     # Show result
     fig_img = plt.figure(figsize=(12, 6))
     ax_sharp = fig_img.add_subplot(121)
-    ax_sharp.imshow(reinhard(img*0.5))
+    ax_sharp.imshow(reinhard(img * 0.5))
     ax_sharp.set_title("Original")
 
     ax_result = fig_img.add_subplot(122, sharex=ax_sharp, sharey=ax_sharp)
-    ax_result.imshow(reinhard(result_image*0.5))
+    ax_result.imshow(reinhard(result_image * 0.5))
     ax_result.set_title("With DoF")
     fig_img.tight_layout()
     fig_img.show()
@@ -218,9 +223,16 @@ def main():
     plt.show()
 
     print("Writing out images")
-    iio.imwrite(f"results/circles_of_confusion_fd_{args.focus_distance}_f_{args.f_number}.exr", blur_radius_px)
-    iio.imwrite(f"results/input.png", reinhard(img*0.5))
-    iio.imwrite(f"results/result_fd_{focus_distance}_f_{args.f_number}.png", reinhard(result_image*0.5))
+    iio.imwrite(
+        f"results/circles_of_confusion_fd_{args.focus_distance}_f_{args.f_number}.exr",
+        blur_radius_px,
+    )
+    input_image_8 = (reinhard(img * 0.5) * 255).astype(np.uint8)
+    iio.imwrite(f"results/input.png", input_image_8)
+    result_image_8 = (reinhard(result_image * 0.5) * 255).astype(np.uint8)
+    iio.imwrite(
+        f"results/result_fd_{focus_distance}_f_{args.f_number}.png", result_image_8
+    )
 
 
 if __name__ == "__main__":
