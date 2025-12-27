@@ -14,10 +14,9 @@ CompileFlags:
     - -forward-unknown-to-host-compiler
     - -Xptxas=*
     - -Xcompiler=*
-  CompilationDatabase: "build"
+CompilationDatabase: "build"
 
 InlayHints:
-  # Disables automatic insertion of missing #include statements on completion
   autoDeclaration: false
 
 Diagnostics:
@@ -37,4 +36,7 @@ Diagnostics:
 
 Index:
   Background: Build
-  HeaderInsertion: never
+
+Config:
+  Completion:
+    HeaderInsertion: never

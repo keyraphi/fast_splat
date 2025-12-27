@@ -232,7 +232,7 @@ __global__ void fast_splat_2d_kernel(
     const size_t target_height) {
   uint32_t tile_id = blockIdx.x;
 
-  uint32_t tiles_per_width = target_width / TILE_SIZE_X;
+  uint32_t tiles_per_width = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
   uint32_t tile_x = tile_id % tiles_per_width;
   uint32_t tile_y = tile_id / tiles_per_width;
 
@@ -273,6 +273,8 @@ __global__ void fast_splat_2d_kernel(
              patch_id, patch_left, patch_top);
       printf("patch_id: %u, patch_left_in_tile: %f, patch_top_in_tile: %f\n",
              patch_id, patch_left_in_tile, patch_top_in_tile);
+      printf("tile_id: %u, tile_x_px: %u, tile_y_px: %u\n",
+             patch_id, tile_x_px , tile_y_px);
     }
     // attomicly add the pixels of this patch to this tile at the correct
     // positions using bilinear interpolation
@@ -341,16 +343,16 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
                         const size_t patch_height, float *__restrict__ result,
                         const size_t target_width, const size_t target_height) {
   // Determine how many target patches there will be
-  size_t target_patches_X = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
-  size_t target_patches_Y = (target_height + TILE_SIZE_Y - 1) / TILE_SIZE_Y;
-  size_t m_target_patches = target_patches_X * target_patches_Y;
-  thrust::device_vector<uint32_t> used_patches_bitmap(m_target_patches *
+  size_t tiles_X = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
+  size_t tiles_Y = (target_height + TILE_SIZE_Y - 1) / TILE_SIZE_Y;
+  size_t total_tiles = tiles_X * tiles_Y;
+  thrust::device_vector<uint32_t> used_patches_bitmap(total_tiles *
                                                       patch_count);
   fflush(stdout);
-  printf("DEBUG: 1. target_patches_X: %lu, target_patches_Y: %lu, "
-         "m_target_patches: %lu, patch_count: %lu, target_width: %lu, "
+  printf("DEBUG: 1. tiles_X: %lu, tiles_Y: %lu, "
+         "total_tiles: %lu, patch_count: %lu, target_width: %lu, "
          "target_height: %lu\n",
-         target_patches_X, target_patches_Y, m_target_patches, patch_count,
+         tiles_X, tiles_Y, total_tiles, patch_count,
          target_width, target_height);
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
@@ -361,11 +363,11 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   // one thread for every Patch*Target_patch
   const size_t THREADS = 256;
   const size_t NM_BLOCKS =
-      (m_target_patches * patch_count + THREADS - 1) / THREADS;
+      (total_tiles * patch_count + THREADS - 1) / THREADS;
   // printf("DEBUG: 3. THREADS: %lu, NM_BLOCKS: %lu\n", THREADS, NM_BLOCKS);
   find_source_patches_for_target_patches<<<NM_BLOCKS, THREADS>>>(
       position_list, patch_count, patch_radius_x, patch_radius_y, target_width,
-      m_target_patches, used_patches_bitmap.data().get());
+      total_tiles, used_patches_bitmap.data().get());
   // DEBUG 4:
   // thrust::host_vector<uint32_t> bitmap_cpu = used_patches_bitmap;
   // printf("DEBUG: 4. used_patches_bitmap\n");
@@ -382,7 +384,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       compute_indices_from_bitmap(used_patches_bitmap, m_target_patches,
                                   patch_count);
 
-  fast_splat_2d_kernel<<<m_target_patches, 256>>>(
+  fast_splat_2d_kernel<<<total_tiles, 256>>>(
       patch_list, patch_width, patch_height, patch_count, position_list,
       indices.data().get(), patches_per_tile.data().get(),
       tile_index_offsets.data().get(), result, target_width, target_height);
