@@ -28,7 +28,7 @@ def main():
     result_gpu = splat(patches, positions, target)
     result_gpu = torch.from_dlpack(result_gpu)
 
-    print(f"CPU result sum: {}, GPU result sum: {}", result_cpu.sum(), result_gpu.sum())
+    print(f"CPU result sum: {result_cpu.sum()}, GPU result sum: {result_gpu.sum()}")
 
     fig_cpu = plt.figure()
     ax = fig_cpu.add_subplot(111)
