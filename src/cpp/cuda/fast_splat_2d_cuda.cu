@@ -18,8 +18,8 @@
 #include <thrust/scan.h>
 #include <tuple>
 
-#define TILE_SIZE_X 64
-#define TILE_SIZE_Y 64
+#define TILE_SIZE_X 32
+#define TILE_SIZE_Y 32
 
 void cuda_debug_print(const std::string &kernel_name) {
   cudaError_t err = cudaDeviceSynchronize();
