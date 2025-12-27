@@ -139,9 +139,9 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
 __device__ inline void
 bilinear_splat(const float src_red, const float src_green, const float src_blue,
                const float x_in_tile, const float y_in_tile, float *tile) {
-  const int left = x_in_tile;
+  const int left = floorf(x_in_tile);
   const int right = left + 1;
-  const int top = y_in_tile;
+  const int top = floor(y_in_tile);
   const int bottom = top + 1;
 
   if (left >= 0 && left < TILE_SIZE_X) {

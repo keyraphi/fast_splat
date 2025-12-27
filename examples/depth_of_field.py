@@ -130,6 +130,7 @@ def main():
     fig_blur_radius = plt.figure(figsize=(6, 6))
     blur_radius_ax = fig_blur_radius.add_subplot(111)
     blur_radius_ax.imshow(blur_radius_px)
+    blur_radius_ax.set_title("circle of confusion radius")
     fig_blur_radius.show()
 
     # Compute patches in batches of fixed size and add them to result incrementally
