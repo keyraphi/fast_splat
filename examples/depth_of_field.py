@@ -217,6 +217,10 @@ def main():
 
     plt.show()
 
+    print("Writing out images")
+    iio.imwrite("circles_of_confusion.exr", blur_radius_px)
+    iio.imwrite("result.exr", result_image)
+
 
 if __name__ == "__main__":
     main()
