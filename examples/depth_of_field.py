@@ -101,7 +101,7 @@ def main():
     args = parser.parse_args()
 
     img = iio.imread("scene.exr", plugin="opencv", flags=cv2.IMREAD_UNCHANGED)[:, :, :3]
-    img = img * 0.5
+    # img = img * 0.5
     depth = iio.imread("depth.exr", plugin="opencv", flags=cv2.IMREAD_UNCHANGED)[
         :, :, 0
     ]
@@ -206,11 +206,11 @@ def main():
     # Show result
     fig_img = plt.figure(figsize=(12, 6))
     ax_sharp = fig_img.add_subplot(121)
-    ax_sharp.imshow(reinhard(img))
+    ax_sharp.imshow(reinhard(img*0.5))
     ax_sharp.set_title("Original")
 
     ax_result = fig_img.add_subplot(122, sharex=ax_sharp, sharey=ax_sharp)
-    ax_result.imshow(reinhard(result_image))
+    ax_result.imshow(reinhard(result_image*0.5))
     ax_result.set_title("With DoF")
     fig_img.tight_layout()
     fig_img.show()
@@ -219,7 +219,7 @@ def main():
 
     print("Writing out images")
     iio.imwrite("circles_of_confusion.exr", blur_radius_px)
-    iio.imwrite("result.exr", result_image)
+    iio.imwrite("result.exr", result_image.numpy())
 
 
 if __name__ == "__main__":
