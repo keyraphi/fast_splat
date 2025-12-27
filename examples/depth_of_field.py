@@ -205,12 +205,12 @@ def main():
     # Show result
     fig_img = plt.figure(figsize=(12, 6))
     ax_sharp = fig_img.add_subplot(121)
-    # ax_sharp.imshow(aces_approx(img))
     ax_sharp.imshow(reinhard(img))
+    ax_sharp.set_title("Original")
 
-    ax_cpu = fig_img.add_subplot(122, sharex=ax_sharp, sharey=ax_sharp)
-    # ax_cpu.imshow(aces_approx(np.from_dlpack(result_image)))
-    ax_cpu.imshow(reinhard(result_image))
+    ax_result = fig_img.add_subplot(122, sharex=ax_sharp, sharey=ax_sharp)
+    ax_result.imshow(reinhard(result_image))
+    ax_result.set_title("With DoF")
     fig_img.tight_layout()
     fig_img.show()
 
