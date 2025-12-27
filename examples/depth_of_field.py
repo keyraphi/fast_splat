@@ -177,7 +177,7 @@ def main():
             )
             # torch.cuda.synchronize()
             duration_splatting += time() - time_before_splatting
-        result_image = torch.from_dlpack(result_image).cpu()
+        result_image = torch.from_dlpack(result_image).cpu().numpy()
     else:
         result_image = np.zeros_like(img)
         for indices in tqdm(batch_indices):
@@ -218,8 +218,8 @@ def main():
     plt.show()
 
     print("Writing out images")
-    iio.imwrite("circles_of_confusion.exr", blur_radius_px)
-    iio.imwrite("result.exr", result_image.numpy())
+    iio.imwrite(f"results/circles_of_confusion_fd_{args.focus_distance}_f_{args.f_number}.exr", blur_radius_px)
+    iio.imwrite(f"results/result_fd_{focus_distance}_f_{args.f_number}.exr", result_image)
 
 
 if __name__ == "__main__":
