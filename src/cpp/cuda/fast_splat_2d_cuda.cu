@@ -368,7 +368,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   find_source_patches_for_target_patches<<<NM_BLOCKS, THREADS>>>(
       position_list, patch_count, patch_radius_x, patch_radius_y, target_width,
       total_tiles, used_patches_bitmap.data().get());
-  DEBUG 4:
+  // DEBUG 4:
   thrust::host_vector<uint32_t> bitmap_cpu = used_patches_bitmap;
   printf("DEBUG: 4. used_patches_bitmap\n");
   for (size_t m = 0; m < total_tiles; m++) {
@@ -378,7 +378,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
     }
     printf("\n");
   }
-  END DEBUG
+  // END DEBUG
 
   const auto [indices, patches_per_tile, tile_index_offsets] =
       compute_indices_from_bitmap(used_patches_bitmap, total_tiles,
