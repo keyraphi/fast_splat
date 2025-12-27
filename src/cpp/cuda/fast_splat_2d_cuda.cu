@@ -296,8 +296,8 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       compute_indices_from_bitmap(used_patches_bitmap, total_tiles,
                                   patch_count);
 
-  const size_t THREADS_SPLAT_KERNEL = 1024;
-  fast_splat_2d_kernel<<<total_tiles, 1024>>>(
+  const size_t THREADS_SPLAT_KERNEL = 128;
+  fast_splat_2d_kernel<<<total_tiles, THREADS_SPLAT_KERNEL>>>(
       patch_list, patch_width, patch_height, patch_count, position_list,
       indices.data().get(), patches_per_tile.data().get(),
       tile_index_offsets.data().get(), result, target_width, target_height);
