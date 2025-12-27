@@ -124,7 +124,8 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
 
   // Use copy_if to extract only indices where bitmap is 1
   // Count the number of 1s first to allocate the right size
-  uint32_t total_ones = thrust::reduce(bitmap.begin(), bitmap.end());
+  // equivalent to summing up sums of rows
+  uint32_t total_ones = thrust::reduce(row_sums.begin(), row_sums.end());
   thrust::device_vector<uint32_t> result(total_ones);
 
   thrust::copy_if(column_indices_begin, // Source: column indices
