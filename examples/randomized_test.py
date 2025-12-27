@@ -44,7 +44,7 @@ def main():
     ax.set_title("diff")
 
     print("Difference sum:", torch.abs(result_cpu - result_gpu.cpu()).sum())
-    print("Max absolute difference:", torch.max(torch.abs(cpu_result - result_gpu.cpu())))
+    print("Max absolute difference:", torch.max(torch.abs(result_cpu - result_gpu.cpu())))
 
 
 if __name__ == "__main__":
