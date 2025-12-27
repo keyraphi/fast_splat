@@ -1,12 +1,14 @@
 #include "fast_splat_2d_cpu.h"
 #include <cstddef>
+#include <cmath>
+
 
 void bilinear_splat_pixel(const float red, const float green, const float blue,
                           const float x, const float y, float *image,
                           size_t width, size_t height) {
-  int x_left = static_cast<int>(x);
+  int x_left = static_cast<int>(std::floor(x));
   int x_right = x_left + 1;
-  int y_top = static_cast<int>(y);
+  int y_top = static_cast<int>(std::floor(y));
   int y_bottom = y_top + 1;
 
   if (x_left >= 0 && x_left < static_cast<int>(width)) {
