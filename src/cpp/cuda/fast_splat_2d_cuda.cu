@@ -282,8 +282,6 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   fflush(stdout);
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
-  patch_radius_x,
-         patch_radius_y);
 
   // one thread for every Patch*Target_patch
   const size_t THREADS = 256;
