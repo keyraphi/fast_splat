@@ -269,6 +269,10 @@ __global__ void fast_splat_2d_kernel(
     if (tile_id == 390 && threadIdx.x == 0 && i == 0) {
       printf("patch_id: %u, patch_center_pos_x: %f, patch_center_pos_y: %f\n",
              patch_id, patch_center_pos_x, patch_center_pos_y);
+      printf("patch_id: %u, patch_left: %f, patch_top: %f\n",
+             patch_id, patch_left, patch_top);
+      printf("patch_id: %u, patch_left_in_tile: %f, patch_top_in_tile: %f\n",
+             patch_id, patch_left_in_tile, patch_top_in_tile);
     }
     // attomicly add the pixels of this patch to this tile at the correct
     // positions using bilinear interpolation
@@ -286,8 +290,10 @@ __global__ void fast_splat_2d_kernel(
       uint32_t y_in_patch = idx_in_patch / patch_width;
       float x_in_tile = x_in_patch + patch_left_in_tile;
       float y_in_tile = y_in_patch + patch_top_in_tile;
+      // TODO: y_in_tile is negative (-40 - -300) for all patches here 
       if (tile_id == 390 && threadIdx.x == 0 && i == 0 && idx_in_patch == 0) {
-        printf("x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
+        printf("SPLAT: x_in_patch: %u, y_in_patch: %u\n", x_in_patch, y_in_patch);
+        printf("SPLAT: x_in_tile: %f, y_in_tile: %f\n", x_in_tile, y_in_tile);
       }
       if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < TILE_SIZE_X &&
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < TILE_SIZE_Y) {
