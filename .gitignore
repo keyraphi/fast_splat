@@ -23,3 +23,5 @@ Thumbs.db
 # Python
 *.pyc
 *.pyo
+
+results/
