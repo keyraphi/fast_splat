@@ -42,7 +42,7 @@ void cuda_debug_print(const std::string &kernel_name) {
  * position and the target patch overlap in any way the corresponding bitmap
  * value should be set to 1, otherwise 0;
  */
-__global__ void find_source_patches_for_target_patches(
+__global__ void find_source_patches_for_target_tiles(
     const float *__restrict__ position_list, const size_t patch_count,
     const float patch_radius_x, const float patch_radius_y,
     const size_t target_width, const size_t target_count, uint32_t *bitmap) {
@@ -287,7 +287,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   const size_t THREADS = 256;
   const size_t NM_BLOCKS =
       (total_tiles * patch_count + THREADS - 1) / THREADS;
-  find_source_patches_for_target_patches<<<NM_BLOCKS, THREADS>>>(
+  find_source_patches_for_target_tiles<<<NM_BLOCKS, THREADS>>>(
       position_list, patch_count, patch_radius_x, patch_radius_y, target_width,
       total_tiles, used_patches_bitmap.data().get());
 
