@@ -2,8 +2,10 @@ name: Build Wheels
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch: # Allows manual trigger
+    # Trigger on both main and optimize
+    branches: [main, optimize]
+    tags: ["v*"] # Keep your release tags working
+  workflow_dispatch:
 
 jobs:
   build_wheels:
@@ -22,7 +24,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
       - name: Install cibuildwheel
         run: python -m pip install cibuildwheel==2.21.3
@@ -30,20 +32,22 @@ jobs:
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
-          # Use a Manylinux image that has CUDA pre-installed
-          # 'nvidia/cuda' images are common, but for cibuildwheel, we use
-          # a specialized container or install it via CIBW_BEFORE_ALL_LINUX.
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_BEFORE_ALL_LINUX: >
             yum install -y yum-utils &&
             yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo &&
             yum install -y cuda-nvcc-12-4 cuda-cudart-devel-12-4 cuda-libraries-devel-12-4
 
-          # Only build for modern 64-bit Linux
-          CIBW_BUILD: "cp3*-manylinux_x86_64"
-          CIBW_SKIP: "cp36-* cp37-* cp38-* pp*"
+          # LOGIC: If branch is 'optimize', build only 3.12.
+          # Otherwise (main or tags), build 3.9 through 3.13.
+          CIBW_BUILD: >-
+            ${{ github.ref_name == 'optimize'
+                && 'cp312-manylinux_x86_64'
+                || 'cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64'
+            }}
 
-          # Pass environment variables to CMake if needed
+          CIBW_SKIP: "pp*"
+
           CIBW_ENVIRONMENT: >
             PATH=$PATH:/usr/local/cuda-12.4/bin
             LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-12.4/lib64
@@ -52,7 +56,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: cibw-wheels
+          # Use the branch name in the artifact to distinguish them easily
+          name: cibw-wheels-${{ github.ref_name }}
           path: ./wheelhouse/*.whl
 
   upload_release:
@@ -61,7 +66,7 @@ jobs:
     permissions:
       contents: write
     # Use this if condition to ensure it only runs for tags
-    if: github.ref_type == 'tag' 
+    if: github.ref_type == 'tag'
     steps:
       - uses: actions/download-artifact@v4
         with:
