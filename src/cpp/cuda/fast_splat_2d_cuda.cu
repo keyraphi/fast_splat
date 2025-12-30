@@ -319,6 +319,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       static_cast<uint32_t>(total_tiles), used_patches_bitmap.data().get());
 
   // DEBUG
+  cuda_debug_print("find_source_patches_for_target_tiles");
   thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
   printf("DEBUG: 4. used_patches_bitmap\n");
   for (size_t m = 0; m < total_tiles; m++) {
