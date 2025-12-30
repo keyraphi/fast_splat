@@ -294,6 +294,12 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
 
+  printf("DEBUG: 1. tiles_X: %lu, tiles_Y: %lu, "
+         "total_tiles: %lu, patch_count: %lu, target_width: %lu, "
+         "target_height: %lu\n",
+         tiles_X, tiles_Y, total_tiles, patch_count, target_width,
+         target_height);
+
   // one thread for every Patch*Target_patch
   const dim3 threads_find_kernel(64, 64);
   const dim3 grid_dim(
