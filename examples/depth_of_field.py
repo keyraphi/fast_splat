@@ -103,7 +103,7 @@ def main():
     args = parser.parse_args()
 
     img = iio.imread("scene.exr", plugin="opencv", flags=cv2.IMREAD_UNCHANGED)[:, :, :3]
-    img = np.ascontiguousarray(img.transpose([2, 0, 1]))
+    img = img.transpose([2, 0, 1])
     # img = img * 0.5
     depth = iio.imread("depth.exr", plugin="opencv", flags=cv2.IMREAD_UNCHANGED)[
         :, :, 0
@@ -176,6 +176,10 @@ def main():
             position_list_batch = pixel_coordinates[:, indices]
             # torch.cuda.synchronize()
             duration_circle_creation += time() - time_before_circle_creation
+            print(f"DEBUG: {patch_list_batch.shape}, {position_list_batch.shape}, {result_image.shape}")
+            print("DEBUG:", patch_list_batch)
+            print("DEBUG:", position_list_batch)
+            print("DEBUG:", result_image)
 
             # splat
             time_before_splatting = time()
