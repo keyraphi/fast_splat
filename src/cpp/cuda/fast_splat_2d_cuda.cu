@@ -293,7 +293,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       (patch_count + threads_find_kernel.x - 1) / threads_find_kernel.x,
       (total_tiles + threads_find_kernel.y - 1) / threads_find_kernel.y);
   // DEBUG
-  printf("DEBUG: threads_find_kernel: (%u, %u), grid_dim: (%u, $u)\n", threads_find_kernel.x, threads_find_kernel.y, grid_dim.x, grid_dim.y)
+  printf("DEBUG: threads_find_kernel: (%u, %u), grid_dim: (%u, %u)\n", threads_find_kernel.x, threads_find_kernel.y, grid_dim.x, grid_dim.y);
   // DEBUG
   find_source_patches_for_target_tiles<<<grid_dim, threads_find_kernel>>>(
       position_list, static_cast<uint32_t>(patch_count), patch_radius_x,
