@@ -59,13 +59,16 @@ __global__ void find_source_patches_for_target_tiles(
     return;
   }
 
-  size_t patches_per_row = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
+  const float T_SIZE_X = static_cast<float>(TILE_SIZE_X);
+  const float T_SIZE_Y = static_cast<float>(TILE_SIZE_Y);
+
+  size_t patches_per_row = (target_width + T_SIZE_X - 1) / T_SIZE_X;
   size_t target_patch_y = target_m / patches_per_row;
   size_t target_patch_x = target_m % patches_per_row;
-  auto target_x_left = static_cast<float>(target_patch_x * TILE_SIZE_X);
-  auto target_y_top = static_cast<float>(target_patch_y * TILE_SIZE_Y);
-  float target_x_right = target_x_left + TILE_SIZE_X;
-  float target_y_bottom = target_y_top + TILE_SIZE_Y;
+  auto target_x_left = static_cast<float>(target_patch_x * T_SIZE_X);
+  auto target_y_top = static_cast<float>(target_patch_y * T_SIZE_Y);
+  float target_x_right = target_x_left + T_SIZE_X;
+  float target_y_bottom = target_y_top + T_SIZE_Y;
 
   float pos_x = position_list[position_n * 2];
   float pos_y = position_list[position_n * 2 + 1];
