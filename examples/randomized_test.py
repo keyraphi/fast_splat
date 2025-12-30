@@ -10,12 +10,12 @@ def main():
     args = parser.parse_args()
 
     device = "cpu"
-    target = torch.zeros([1080, 1440, 3], device=device)
+    target = torch.zeros([3, 1080, 1440], device=device)
     # create random patches with random center positions
-    patches = torch.rand([args.N_PATCHES, 10, 10, 3], device=device)
-    positions = torch.rand([args.N_PATCHES, 2], device=device)
-    positions[:, 0] *= 1440
-    positions[:, 1] *= 1080
+    patches = torch.rand([args.N_PATCHES, 3, 10, 10], device=device)
+    positions = torch.rand([2, args.N_PATCHES], device=device)
+    positions[0, :] *= 1440
+    positions[1, :] *= 1080
     # run splatting on CPU
     result_cpu = splat(patches, positions, target)
     result_cpu = torch.from_dlpack(result_cpu)
@@ -29,6 +29,9 @@ def main():
     result_gpu = torch.from_dlpack(result_gpu)
 
     print(f"CPU result sum: {result_cpu.sum()}, GPU result sum: {result_gpu.sum()}")
+
+    result_cpu = result_cpu.permute([2, 0, 1])
+    result_gpu = result_gpu.permute([2, 0, 1])
 
     fig_cpu = plt.figure()
     ax = fig_cpu.add_subplot(111)

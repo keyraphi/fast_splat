@@ -85,8 +85,8 @@ void fast_splat_2d_cpu_impl(const float *__restrict__ patch_list,
 #pragma omp parallel for
   for (size_t i = 0; i < patch_count; ++i) {
     const float *patch = patch_list + i * patch_height * patch_width * 3;
-    const float pos_x = position_list[i * 2];
-    const float pos_y = position_list[i * 2 + 1];
+    const float pos_x = position_list[i];
+    const float pos_y = position_list[i + patch_count];
 
     const float start_pos_x = pos_x - patch_radius_x;
     const float start_pos_y = pos_y - patch_radius_y;

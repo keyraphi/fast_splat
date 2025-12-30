@@ -18,8 +18,8 @@ def create_circles_of_confusion(circle_radius_list: np.ndarray, max_blur_px: int
         np.floor(-max_blur_px), np.ceil(max_blur_px), 2 * int(np.ceil(max_blur_px)) + 1
     )
     xs, ys = np.meshgrid(line, line)
-    points = np.stack([ys, xs], axis=-1)
-    distances_patch = np.linalg.norm(points, axis=-1)
+    points = np.stack([ys, xs], axis=0)
+    distances_patch = np.linalg.norm(points, axis=0)
     patches[:] = distances_patch
 
     # use actual radii to mask away distances that are further away
@@ -40,11 +40,12 @@ def create_circles_of_confusion_gpu(circle_radius_list: torch.Tensor, max_blur_p
 
     ys, xs = torch.meshgrid(line, line, indexing="ij")
 
-    points = torch.stack([ys, xs], dim=-1)
-    dist_patch = torch.linalg.vector_norm(points, dim=-1)
+    points = torch.stack([ys, xs], dim=0)
+    dist_patch = torch.linalg.vector_norm(points, dim=0)
 
     patches = dist_patch[None, :, :] < radius_clamped[:, None, None]
     patches = patches.to(torch.float32)
+
 
     sums = torch.sum(patches, dim=(1, 2), keepdim=True)
 
@@ -90,7 +91,7 @@ def main():
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=100000,
+        default=10000,
         help="Number of patches to splat simultaneously. This is limiting the memory that is used.",
     )
     parser.add_argument(
@@ -102,6 +103,7 @@ def main():
     args = parser.parse_args()
 
     img = iio.imread("scene.exr", plugin="opencv", flags=cv2.IMREAD_UNCHANGED)[:, :, :3]
+    img = np.ascontiguousarray(img.transpose([2, 0, 1]))
     # img = img * 0.5
     depth = iio.imread("depth.exr", plugin="opencv", flags=cv2.IMREAD_UNCHANGED)[
         :, :, 0
@@ -111,7 +113,7 @@ def main():
     f_number = args.f_number
     aperture_radius = focal_length / (2 * f_number)
     horizontal_film_size = 0.036  # 36 mm
-    pixel_size = horizontal_film_size / img.shape[1]
+    pixel_size = horizontal_film_size / img.shape[2]
     focus_distance = args.focus_distance
 
     # lens maker equations
@@ -136,19 +138,19 @@ def main():
 
     # Compute patches in batches of fixed size and add them to result incrementally
     batch_size = args.batch_size
-    n_batches = int(np.ceil(img.shape[0] * img.shape[1] / batch_size))
-    indices = np.arange(img.shape[0] * img.shape[1])
-    np.random.shuffle(indices)
+    n_batches = int(np.ceil(img.shape[1] * img.shape[2] / batch_size))
+    indices = np.arange(img.shape[1] * img.shape[2])
+    # np.random.shuffle(indices)
     batch_indices = np.array_split(indices, n_batches)
 
     duration_circle_creation = 0
     duration_splatting = 0
-    pixel_list = np.reshape(img, [-1, 3])
+    pixel_list = np.reshape(img, [3, -1]).transpose()
     blur_radius_px_list = np.reshape(blur_radius_px, [-1])
 
-    xs, ys = np.meshgrid(np.arange(img.shape[1]), np.arange(img.shape[0]))
-    pixel_coordinates = np.stack([xs, ys], axis=-1)
-    pixel_coordinates = pixel_coordinates.reshape([-1, 2])
+    xs, ys = np.meshgrid(np.arange(img.shape[2]), np.arange(img.shape[1]))
+    pixel_coordinates = np.stack([xs, ys], axis=0)
+    pixel_coordinates = pixel_coordinates.reshape([2, -1])
 
     if args.use_gpu:
         # device = "cpu"
@@ -169,9 +171,9 @@ def main():
                 blur_radius_px_list[indices], max_blur_px
             )
             patch_list_batch = (
-                patch_list_batch[:, :, :, None] * pixel_list[indices, None, None, :]
+                patch_list_batch[:, None, :, :] * pixel_list[indices, :, None, None]
             )
-            position_list_batch = pixel_coordinates[indices]
+            position_list_batch = pixel_coordinates[:, indices]
             # torch.cuda.synchronize()
             duration_circle_creation += time() - time_before_circle_creation
 
@@ -192,9 +194,9 @@ def main():
                 blur_radius_px_list[indices], max_blur_px
             )
             patch_list_batch = (
-                patch_list_batch[:, :, :, None] * pixel_list[indices, None, None, :]
+                patch_list_batch[:, None,:, : ] * pixel_list[indices,:, None, None]
             )
-            position_list_batch = pixel_coordinates[indices]
+            position_list_batch = pixel_coordinates[:, indices]
             duration_circle_creation += time() - time_before_circle_creation
 
             # splat
@@ -208,6 +210,8 @@ def main():
     print(f"Creating the patches took {duration_circle_creation} sec.")
     print(f"Splatting took {duration_splatting} sec.")
 
+    img = img.transpose([1,2,0])
+    result_image = result_image.transpose([1,2,0])
     # Show result
     fig_img = plt.figure(figsize=(12, 6))
     ax_sharp = fig_img.add_subplot(121)
