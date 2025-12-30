@@ -21,11 +21,6 @@
 #define TILE_SIZE_X 32
 #define TILE_SIZE_Y 32
 
-// TODO Optimize:
-// use SoA instead of AoS everywhere
-// Avoid as much blockage through atomicAdds as possible (__match_any_sync __ffs __shfl_sync)
-// Maybe one warp per patch instead of sequentially going through the patches 
-
 void cuda_debug_print(const std::string &kernel_name) {
   cudaError_t err = cudaDeviceSynchronize();
   if (err != cudaSuccess) {
@@ -48,30 +43,29 @@ void cuda_debug_print(const std::string &kernel_name) {
  * value should be set to 1, otherwise 0;
  */
 __global__ void find_source_patches_for_target_tiles(
-    const float *__restrict__ position_list, const size_t patch_count,
+    const float *__restrict__ position_list, const uint32_t patch_count,
     const float patch_radius_x, const float patch_radius_y,
-    const size_t target_width, const size_t target_count, uint8_t *bitmap) {
-
-  size_t tid = threadIdx.x + blockIdx.x * blockDim.x;
-  size_t target_m = tid / patch_count;
-  size_t position_n = tid % patch_count;
+    const uint32_t target_width, const uint32_t target_count, uint8_t *bitmap) {
+  uint32_t position_n = threadIdx.x + blockIdx.x * blockDim.x;
+  uint32_t target_m = threadIdx.y + blockIdx.y * blockDim.y;
   if (position_n >= patch_count || target_m >= target_count) {
     return;
   }
+  uint32_t tid = target_m * patch_count + position_n;
 
-  const float T_SIZE_X = static_cast<float>(TILE_SIZE_X);
-  const float T_SIZE_Y = static_cast<float>(TILE_SIZE_Y);
+  const auto T_SIZE_X = static_cast<uint32_t>(TILE_SIZE_X);
+  const auto T_SIZE_Y = static_cast<uint32_t>(TILE_SIZE_Y);
 
-  size_t patches_per_row = (target_width + T_SIZE_X - 1) / T_SIZE_X;
-  size_t target_patch_y = target_m / patches_per_row;
-  size_t target_patch_x = target_m % patches_per_row;
+  uint32_t tiles_per_row = (target_width + T_SIZE_X - 1) / T_SIZE_X;
+  uint32_t target_patch_y = target_m / tiles_per_row;
+  uint32_t target_patch_x = target_m % tiles_per_row;
   auto target_x_left = static_cast<float>(target_patch_x * T_SIZE_X);
   auto target_y_top = static_cast<float>(target_patch_y * T_SIZE_Y);
-  float target_x_right = target_x_left + T_SIZE_X;
-  float target_y_bottom = target_y_top + T_SIZE_Y;
+  float target_x_right = target_x_left + static_cast<float>(T_SIZE_X);
+  float target_y_bottom = target_y_top + static_cast<float>(T_SIZE_Y);
 
-  float pos_x = position_list[position_n * 2];
-  float pos_y = position_list[position_n * 2 + 1];
+  float pos_x = position_list[position_n];
+  float pos_y = position_list[position_n + patch_count];
 
   uint8_t is_in_m = 0;
 
@@ -111,7 +105,6 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   thrust::exclusive_scan_by_key(keys_begin, keys_begin + (rows * columns),
                                 bitmap.begin(), prefix_sum.begin());
 
-
   // number of entries per row
   thrust::device_vector<uint32_t> row_sums(rows);
   thrust::reduce_by_key(keys_begin, keys_begin + (rows * columns),
@@ -121,7 +114,6 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   // start of each row
   thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
-
 
   //  write indices of patches together
   auto column_indices_begin = thrust::make_transform_iterator(
@@ -152,24 +144,25 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
   const int right = left + 1;
   const int top = floorf(y_in_tile);
   const int bottom = top + 1;
+  const uint32_t pixels_in_tile = TILE_SIZE_X * TILE_SIZE_Y;
 
   if (left >= 0 && left < TILE_SIZE_X) {
     const float weight_left = static_cast<float>(right) - x_in_tile;
     if (top >= 0 && top < TILE_SIZE_Y) {
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_left * weight_top;
-      uint32_t tile_idx = left * 3 + top * TILE_SIZE_X * 3;
+      uint32_t tile_idx = left + top * TILE_SIZE_X;
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_green * weight);
-      atomicAdd(tile + tile_idx + 2, src_blue * weight);
+      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
+      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_left * weight_bottom;
-      uint32_t tile_idx = left * 3 + bottom * TILE_SIZE_X * 3;
+      uint32_t tile_idx = left + bottom * TILE_SIZE_X;
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_green * weight);
-      atomicAdd(tile + tile_idx + 2, src_blue * weight);
+      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
+      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
     }
   }
   if (right >= 0 && right < TILE_SIZE_X) {
@@ -177,18 +170,18 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
     if (top >= 0 && top < TILE_SIZE_Y) {
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_right * weight_top;
-      uint32_t tile_idx = right * 3 + top * TILE_SIZE_X * 3;
+      uint32_t tile_idx = right + top * TILE_SIZE_X;
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_green * weight);
-      atomicAdd(tile + tile_idx + 2, src_blue * weight);
+      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
+      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_right * weight_bottom;
-      uint32_t tile_idx = right * 3 + bottom * TILE_SIZE_X * 3;
+      uint32_t tile_idx = right + bottom * TILE_SIZE_X;
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_green * weight);
-      atomicAdd(tile + tile_idx + 2, src_blue * weight);
+      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
+      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
     }
   }
 }
@@ -209,6 +202,8 @@ __global__ void fast_splat_2d_kernel(
   uint32_t tile_x_px = tile_x * TILE_SIZE_X;
   uint32_t tile_y_px = tile_y * TILE_SIZE_Y;
 
+  const uint32_t patch_pixel_count = patch_width * patch_height;
+
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
 
@@ -226,8 +221,8 @@ __global__ void fast_splat_2d_kernel(
   uint32_t tile_index_offsets_for_this_tile = tile_index_offsets[tile_id];
   for (uint32_t i = 0; i < patches_for_this_tile; i++) {
     uint32_t patch_id = indices[tile_index_offsets_for_this_tile + i];
-    float patch_center_pos_x = position_list[patch_id * 2];
-    float patch_center_pos_y = position_list[patch_id * 2 + 1];
+    float patch_center_pos_x = position_list[patch_id];
+    float patch_center_pos_y = position_list[patch_id + patch_count];
     float patch_left = patch_center_pos_x - patch_radius_x;
     float patch_top = patch_center_pos_y - patch_radius_y;
     float patch_left_in_tile = patch_left - tile_x_px;
@@ -237,12 +232,12 @@ __global__ void fast_splat_2d_kernel(
     for (uint32_t idx_in_patch = threadIdx.x;
          idx_in_patch < patch_height * patch_width;
          idx_in_patch += blockDim.x) {
-      float src_red = patch_list[patch_id * patch_width * patch_height * 3 +
-                                 idx_in_patch * 3];
+      float src_red =
+          patch_list[patch_id * patch_width * patch_height * 3 + idx_in_patch];
       float src_green = patch_list[patch_id * patch_width * patch_height * 3 +
-                                   idx_in_patch * 3 + 1];
+                                   idx_in_patch + patch_pixel_count];
       float src_blue = patch_list[patch_id * patch_width * patch_height * 3 +
-                                  idx_in_patch * 3 + 2];
+                                  idx_in_patch + 2 * patch_pixel_count];
 
       uint32_t x_in_patch = idx_in_patch % patch_width;
       uint32_t y_in_patch = idx_in_patch / patch_width;
@@ -258,6 +253,7 @@ __global__ void fast_splat_2d_kernel(
   __syncthreads();
 
   // add tile on top of the result. No attomic needed, as tiles don't overlap
+  const uint32_t target_pixels = target_width * target_height;
   for (uint32_t idx_in_tile = threadIdx.x;
        idx_in_tile < TILE_SIZE_X * TILE_SIZE_Y * 3; idx_in_tile += blockDim.x) {
     uint32_t color_idx = idx_in_tile % 3;
@@ -269,8 +265,8 @@ __global__ void fast_splat_2d_kernel(
     if (x_in_result >= target_width || y_in_result >= target_height) {
       continue;
     }
-    uint32_t idx_in_result =
-        y_in_result * target_width * 3 + x_in_result * 3 + color_idx;
+    uint32_t idx_in_result = y_in_result * target_width + x_in_result +
+                             color_idx * target_pixels;
 
     result[idx_in_result] += tile[idx_in_tile];
   }
@@ -286,19 +282,20 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   size_t tiles_X = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
   size_t tiles_Y = (target_height + TILE_SIZE_Y - 1) / TILE_SIZE_Y;
   size_t total_tiles = tiles_X * tiles_Y;
-  thrust::device_vector<uint8_t> used_patches_bitmap(total_tiles *
-                                                      patch_count);
-  fflush(stdout);
+  thrust::device_vector<uint8_t> used_patches_bitmap(total_tiles * patch_count);
+  // fflush(stdout);
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
 
   // one thread for every Patch*Target_patch
-  const size_t THREADS_FIND_KERNEL = 256;
-  const size_t NM_BLOCKS =
-      (total_tiles * patch_count + THREADS_FIND_KERNEL - 1) / THREADS_FIND_KERNEL;
-  find_source_patches_for_target_tiles<<<NM_BLOCKS, THREADS_FIND_KERNEL>>>(
-      position_list, patch_count, patch_radius_x, patch_radius_y, target_width,
-      total_tiles, used_patches_bitmap.data().get());
+  const size_t THREADS_FIND_KERNEL = 64;
+  const dim3 grid_dim(
+      (patch_count + THREADS_FIND_KERNEL - 1) / THREADS_FIND_KERNEL,
+      (total_tiles + THREADS_FIND_KERNEL - 1) / THREADS_FIND_KERNEL);
+  find_source_patches_for_target_tiles<<<grid_dim, THREADS_FIND_KERNEL>>>(
+      position_list, static_cast<uint32_t>(patch_count), patch_radius_x,
+      patch_radius_y, static_cast<uint32_t>(target_width),
+      static_cast<uint32_t>(total_tiles), used_patches_bitmap.data().get());
 
   const auto [indices, patches_per_tile, tile_index_offsets] =
       compute_indices_from_bitmap(used_patches_bitmap, total_tiles,

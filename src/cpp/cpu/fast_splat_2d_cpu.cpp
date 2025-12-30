@@ -62,7 +62,7 @@ void bilinear_splat_pixel(const float red, const float green, const float blue,
       image[y_bottom * width + static_cast<size_t>(x_right) ] +=
           weight_bottom_right * red;
 #pragma omp atomic
-      image[y_bottom * width + static_cast<size_t>(x_right) * pixel_count] +=
+      image[y_bottom * width + static_cast<size_t>(x_right) + pixel_count] +=
           weight_bottom_right * green;
 #pragma omp atomic
       image[y_bottom * width + static_cast<size_t>(x_right) + 2*pixel_count] +=

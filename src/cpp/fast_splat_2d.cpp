@@ -17,24 +17,24 @@ using namespace nb::literals;
 // Device-specific type aliases with exact constraints
 
 using TargetImageTypeCPU =
-    nb::ndarray<nb::array_api, float, nb::shape<-1, -1, 3>, nb::c_contig,
+    nb::ndarray<nb::array_api, float, nb::shape<3, -1, -1>, nb::c_contig,
                 nb::device::cpu>;
 using TargetImageTypeCUDA =
-    nb::ndarray<nb::array_api, float, nb::shape<-1, -1, 3>, nb::c_contig,
+    nb::ndarray<nb::array_api, float, nb::shape<3, -1, -1>, nb::c_contig,
                 nb::device::cuda>;
-using PatchListTypeCPU = nb::ndarray<const float, nb::shape<-1, -1, -1, 3>,
+using PatchListTypeCPU = nb::ndarray<const float, nb::shape<-1, 3, -1, -1>,
                                      nb::c_contig, nb::device::cpu>;
-using PatchListTypeCUDA = nb::ndarray<const float, nb::shape<-1, -1, -1, 3>,
+using PatchListTypeCUDA = nb::ndarray<const float, nb::shape<-1, 3, -1, -1>,
                                       nb::c_contig, nb::device::cuda>;
 using PositionListTypeCPU =
-    nb::ndarray<const float, nb::shape<-1, 2>, nb::c_contig, nb::device::cpu>;
+    nb::ndarray<const float, nb::shape<2, -1>, nb::c_contig, nb::device::cpu>;
 using PositionListTypeCUDA =
-    nb::ndarray<const float, nb::shape<-1, 2>, nb::c_contig, nb::device::cuda>;
+    nb::ndarray<const float, nb::shape<2, -1>, nb::c_contig, nb::device::cuda>;
 
 size_t check_dimensions(const PatchListTypeCPU &patch_list,
                         const PositionListTypeCPU &position_list) {
   size_t patch_list_size = patch_list.shape(0);
-  size_t position_list_size = position_list.shape(0);
+  size_t position_list_size = position_list.shape(1);
   if (position_list_size != patch_list_size) {
     std::stringstream ss;
     ss << "fast_splat_2d: The number of positions (" << position_list_size
@@ -49,7 +49,7 @@ size_t check_dimensions(const PatchListTypeCPU &patch_list,
 size_t check_dimensions(const PatchListTypeCUDA &patch_list,
                         const PositionListTypeCUDA &position_list) {
   size_t patch_list_size = patch_list.shape(0);
-  size_t position_list_size = position_list.shape(0);
+  size_t position_list_size = position_list.shape(1);
   if (patch_list_size != position_list_size) {
     std::stringstream ss;
     ss << "fast_splat_2d: The number of positions (" << position_list_size
@@ -75,8 +75,8 @@ auto fast_splat_2d_cpu(const PatchListTypeCPU &patch_list,
               sizeof(float) * target_image.shape(0) * target_image.shape(1) *
                   target_image.shape(2));
   fast_splat_2d_cpu_impl(patch_list.data(), position_list.data(), n_patches,
-                         patch_list.shape(2), patch_list.shape(1), result_data,
-                         target_image.shape(1), target_image.shape(0));
+                         patch_list.shape(3), patch_list.shape(2), result_data,
+                         target_image.shape(2), target_image.shape(1));
   nb::capsule owner(result_data,
                     [](void *ptr) noexcept -> void { delete[] (float *)ptr; });
   return TargetImageTypeCPU(
@@ -111,8 +111,8 @@ auto fast_splat_2d_cuda(const PatchListTypeCUDA &patch_list,
   }
 
   fast_splat_2d_cuda_impl(patch_list.data(), position_list.data(), n_patches,
-                          patch_list.shape(2), patch_list.shape(1), result_data,
-                          target_image.shape(1), target_image.shape(0));
+                          patch_list.shape(3), patch_list.shape(2), result_data,
+                          target_image.shape(2), target_image.shape(1));
 
   nb::capsule owner(result_data,
                     [](void *ptr) noexcept -> void { cuda::cuda_free(ptr); });
@@ -136,16 +136,16 @@ NB_MODULE(fast_splat_2d_backend, module) {
       "This is used when all arguments are on cpu.\n"
       "Args:\n"
       "    patch_list: The image patches that will be splatted to the target "
-      "image. [N, patch_heigt, patch_width, 3]\n"
+      "image. [N, 3, patch_heigt, patch_width]\n"
       "    position_list: List of pixel coordinates (x, y) to which the "
       "patches in the patch list are supposed to splatted to. The patches "
       "center points are placed at those positions. Uses bilinear "
-      "interpolation for non integer positions. [N, 2]\n"
+      "interpolation for non integer positions. [2, N]\n"
 
       "    target_image: The image which to splat to. The patches will be "
-      "added to this image at the given positions.\n\n"
+      "added to this image at the given positions. [3, height, width]\n\n"
       "Returns:\n"
-      "    Copy or reference to the target image (depending on is_inplace) "
+      "    Result image in shape [3, height, width]."
       "with the patches splatted to the given positions.",
       "patch_list"_a, "position_list"_a, "target_image"_a);
 
@@ -155,16 +155,16 @@ NB_MODULE(fast_splat_2d_backend, module) {
       "This is used when all arguments are on gpu.\n"
       "Args:\n"
       "    patch_list: The image patches that will be splatted to the target "
-      "image. [N, patch_heigt, patch_width, 3]\n"
+      "image. [N, 3, patch_heigt, patch_width]\n"
       "    position_list: List of pixel coordinates (x, y) to which the "
       "patches in the patch list are supposed to splatted to. The patches "
       "center points are placed at those positions. Uses bilinear "
-      "interpolation for non integer positions. [N, 2]\n"
+      "interpolation for non integer positions. [2, N]\n"
 
       "    target_image: The image which to splat to. The patches will be "
-      "added to this image at the given positions.\n\n"
+      "added to this image at the given positions. [3, height, width]\n\n"
       "Returns:\n"
-      "    Copy or reference to the target image (depending on is_inplace) "
+      "    Result image in shape [3, height, width]."
       "with the patches splatted to the given positions.",
       "patch_list"_a, "position_list"_a, "target_image"_a);
 }

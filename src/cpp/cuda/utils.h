@@ -8,17 +8,18 @@ namespace nb = nanobind;
 
 namespace cuda {
 // Forward declarations
-using TargetImageTypeCUDA = nb::ndarray<nb::array_api,float, nb::shape<-1, -1, 3>,
-                                        nb::c_contig, nb::device::cuda>;
-using PatchListTypeCUDA = nb::ndarray<const float, nb::shape<-1, -1, -1, 3>,
+using TargetImageTypeCUDA =
+    nb::ndarray<nb::array_api, float, nb::shape<3, -1, -1>, nb::c_contig,
+                nb::device::cuda>;
+using PatchListTypeCUDA = nb::ndarray<const float, nb::shape<-1, 3, -1, -1>,
                                       nb::c_contig, nb::device::cuda>;
 using PositionListTypeCUDA =
-    nb::ndarray<const float, nb::shape<-1, 2>, nb::c_contig, nb::device::cuda>;
+    nb::ndarray<const float, nb::shape<2, -1>, nb::c_contig, nb::device::cuda>;
 
 // CUDA memory management functions
 void *cuda_allocate(size_t size);
 void cuda_free(void *ptr);
-bool cuda_memcpy(void *dest, void* src, size_t bytes);
+bool cuda_memcpy(void *dest, void *src, size_t bytes);
 
 // Device handling utils
 auto get_cuda_device_from_ndarray(const nb::ndarray<nb::device::cuda> &arr)
