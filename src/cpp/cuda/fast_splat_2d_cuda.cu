@@ -1,4 +1,5 @@
 #include "fast_splat_2d_cuda.h"
+#include <__clang_cuda_builtin_vars.h>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -48,6 +49,13 @@ __global__ void find_source_patches_for_target_tiles(
     const uint32_t target_width, const uint32_t target_count, uint8_t *bitmap) {
   uint32_t position_n = threadIdx.x + blockIdx.x * blockDim.x;
   uint32_t target_m = threadIdx.y + blockIdx.y * blockDim.y;
+  if (threadIdx.x == 0) {
+    if (threadIdx.y == 0) {
+      printf(
+          "position_n: %u, target_m: %u, patch_count: %u, target_count: %u\n",
+          position_n, target_m, patch_count, target_count);
+    }
+  }
   if (position_n >= patch_count || target_m >= target_count) {
     return;
   }
