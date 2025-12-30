@@ -140,7 +140,7 @@ def main():
     batch_size = args.batch_size
     n_batches = int(np.ceil(img.shape[1] * img.shape[2] / batch_size))
     indices = np.arange(img.shape[1] * img.shape[2])
-    # np.random.shuffle(indices)
+    np.random.shuffle(indices)
     batch_indices = np.array_split(indices, n_batches)
 
     duration_circle_creation = 0
@@ -176,10 +176,9 @@ def main():
             position_list_batch = pixel_coordinates[:, indices]
             # torch.cuda.synchronize()
             duration_circle_creation += time() - time_before_circle_creation
-            print(f"DEBUG: {patch_list_batch.shape}, {position_list_batch.shape}, {result_image.shape}")
+            print(f"DEBUG: {patch_list_batch.shape}, {position_list_batch.shape})
             print("DEBUG:", patch_list_batch)
             print("DEBUG:", position_list_batch)
-            print("DEBUG:", result_image)
 
             # splat
             time_before_splatting = time()
