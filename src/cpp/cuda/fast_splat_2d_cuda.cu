@@ -288,11 +288,11 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   float patch_radius_y = patch_height / 2.F;
 
   // one thread for every Patch*Target_patch
-  const size_t THREADS_FIND_KERNEL = 64;
+  const dim3 threads_find_kernel(64, 64);
   const dim3 grid_dim(
-      (patch_count + THREADS_FIND_KERNEL - 1) / THREADS_FIND_KERNEL,
-      (total_tiles + THREADS_FIND_KERNEL - 1) / THREADS_FIND_KERNEL);
-  find_source_patches_for_target_tiles<<<grid_dim, THREADS_FIND_KERNEL>>>(
+      (patch_count + threads_find_kernel.x - 1) / threads_find_kernel.x,
+      (total_tiles + threads_find_kernel.y - 1) / threads_find_kernel.y);
+  find_source_patches_for_target_tiles<<<grid_dim, threads_find_kernel>>>(
       position_list, static_cast<uint32_t>(patch_count), patch_radius_x,
       patch_radius_y, static_cast<uint32_t>(target_width),
       static_cast<uint32_t>(total_tiles), used_patches_bitmap.data().get());
