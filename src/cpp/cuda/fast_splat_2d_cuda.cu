@@ -265,8 +265,8 @@ __global__ void fast_splat_2d_kernel(
     if (x_in_result >= target_width || y_in_result >= target_height) {
       continue;
     }
-    uint32_t idx_in_result = y_in_result * target_width + x_in_result +
-                             color_idx * target_pixels;
+    uint32_t idx_in_result =
+        y_in_result * target_width + x_in_result + color_idx * target_pixels;
 
     result[idx_in_result] += tile[idx_in_tile];
   }
@@ -293,23 +293,24 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       (patch_count + threads_find_kernel.x - 1) / threads_find_kernel.x,
       (total_tiles + threads_find_kernel.y - 1) / threads_find_kernel.y);
   // DEBUG
-  printf("DEBUG: threads_find_kernel: (%u, %u), grid_dim: (%u, %u)\n", threads_find_kernel.x, threads_find_kernel.y, grid_dim.x, grid_dim.y);
+  printf("DEBUG: threads_find_kernel: (%u, %u), grid_dim: (%u, %u)\n",
+         threads_find_kernel.x, threads_find_kernel.y, grid_dim.x, grid_dim.y);
   // DEBUG
   find_source_patches_for_target_tiles<<<grid_dim, threads_find_kernel>>>(
       position_list, static_cast<uint32_t>(patch_count), patch_radius_x,
       patch_radius_y, static_cast<uint32_t>(target_width),
       static_cast<uint32_t>(total_tiles), used_patches_bitmap.data().get());
 
-  // DEUG
-  thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
-  printf("DEBUG: 4. used_patches_bitmap\n");
-  for (size_t m = 0; m < total_tiles; m++) {
-    printf("%lu: ", m);
-    for (size_t n = 0; n < patch_count; n++) {
-      printf("%u ", bitmap_cpu[m * patch_count + n]);
-    }
-    printf("\n");
-  }
+  // DEBUG
+  // thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
+  // printf("DEBUG: 4. used_patches_bitmap\n");
+  // for (size_t m = 0; m < total_tiles; m++) {
+  //   printf("%lu: ", m);
+  //   for (size_t n = 0; n < patch_count; n++) {
+  //     printf("%u ", bitmap_cpu[m * patch_count + n]);
+  //   }
+  //   printf("\n");
+  // }
   // DEBUG
 
   const auto [indices, patches_per_tile, tile_index_offsets] =
