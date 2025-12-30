@@ -21,6 +21,11 @@
 #define TILE_SIZE_X 32
 #define TILE_SIZE_Y 32
 
+// TODO Optimize:
+// use SoA instead of AoS everywhere
+// Avoid as much blockage through atomicAdds as possible (__match_any_sync __ffs __shfl_sync)
+// Maybe one warp per patch instead of sequentially going through the patches 
+
 void cuda_debug_print(const std::string &kernel_name) {
   cudaError_t err = cudaDeviceSynchronize();
   if (err != cudaSuccess) {
@@ -45,7 +50,7 @@ void cuda_debug_print(const std::string &kernel_name) {
 __global__ void find_source_patches_for_target_tiles(
     const float *__restrict__ position_list, const size_t patch_count,
     const float patch_radius_x, const float patch_radius_y,
-    const size_t target_width, const size_t target_count, uint32_t *bitmap) {
+    const size_t target_width, const size_t target_count, uint8_t *bitmap) {
 
   size_t tid = threadIdx.x + blockIdx.x * blockDim.x;
   size_t target_m = tid / patch_count;
@@ -65,7 +70,7 @@ __global__ void find_source_patches_for_target_tiles(
   float pos_x = position_list[position_n * 2];
   float pos_y = position_list[position_n * 2 + 1];
 
-  uint32_t is_in_m = 0;
+  uint8_t is_in_m = 0;
 
   // Calculate extended influence area for bilinear interpolation
   float source_left = pos_x - ceilf(patch_radius_x);
@@ -87,7 +92,7 @@ __global__ void find_source_patches_for_target_tiles(
   bitmap[tid] = is_in_m;
 }
 
-auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
+auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
                                  const size_t rows, const size_t columns)
     -> std::tuple<thrust::device_vector<uint32_t>,
                   thrust::device_vector<uint32_t>,
@@ -132,7 +137,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint32_t> &bitmap,
                   column_indices_begin + (rows * columns), // End
                   bitmap.begin(), // Stencil: bitmap values (0 or 1)
                   result.begin(), // Destination
-                  [] __host__ __device__(uint32_t val) { return val == 1; });
+                  [] __host__ __device__(uint8_t val) { return val == 1; });
 
   return {result, row_sums, row_offsets};
 }
@@ -278,7 +283,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   size_t tiles_X = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
   size_t tiles_Y = (target_height + TILE_SIZE_Y - 1) / TILE_SIZE_Y;
   size_t total_tiles = tiles_X * tiles_Y;
-  thrust::device_vector<uint32_t> used_patches_bitmap(total_tiles *
+  thrust::device_vector<uint8_t> used_patches_bitmap(total_tiles *
                                                       patch_count);
   fflush(stdout);
   float patch_radius_x = patch_width / 2.F;
