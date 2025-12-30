@@ -66,7 +66,7 @@ __global__ void find_source_patches_for_target_tiles(
 
   float pos_x = position_list[position_n];
   float pos_y = position_list[position_n + patch_count];
-  if (target_m == 63) {
+  if (target_m == 0) {
     printf("patch %u, pos_x: %f, pos_y: %f\n", position_n, pos_x, pos_y);
     if (position_n == 0) {
       printf("tile %u, (%f, %f), (%f, %f)\n", target_m, target_x_left,
