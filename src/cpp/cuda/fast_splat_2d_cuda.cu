@@ -230,7 +230,7 @@ __global__ void fast_splat_2d_kernel(
     size_t patch_based_idx =
         static_cast<size_t>(patch_id) * patch_width * patch_height * 3;
     if (tile_id == 1529 && threadIdx.x == 0) {
-      printf("tile %lu, patch %u: (%f, %f)\n", tile_id, patch_id, patch_center_pos_x, patch_center_pos_y);
+      printf("tile %lu, patch %u: (%f, %f), (%f, %f)\n", tile_id, patch_id, patch_center_pos_x, patch_center_pos_y, patch_left_in_tile, patch_top_in_tile);
     }
     // attomicly add the pixels of this patch to this tile at the correct
     // positions using bilinear interpolation
