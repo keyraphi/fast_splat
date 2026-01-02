@@ -333,6 +333,15 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   // Add this immediately after the launch!
   check_launch_error("find_source_patches_for_target_tiles");
 
+  thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
+  for (uint32_t i = 0; i < total_tiles; i++) {
+    printf("%u: ", i);
+    for (uint32_t j = 0; j < patch_count; j++) {
+      printf("%u ", bitmap_cpu[i*patch_count + j]);
+    }
+    printf("\n")
+  }
+
   const auto [indices, patches_per_tile, tile_index_offsets] =
       compute_indices_from_bitmap(used_patches_bitmap, total_tiles,
                                   patch_count);
