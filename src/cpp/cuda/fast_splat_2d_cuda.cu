@@ -289,21 +289,42 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   size_t tiles_Y = (target_height + TILE_SIZE_Y - 1) / TILE_SIZE_Y;
   size_t total_tiles = tiles_X * tiles_Y;
   thrust::device_vector<uint8_t> used_patches_bitmap(total_tiles * patch_count);
-  fflush(stdout);
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
+  fflush(stdout);
+  printf("DEBUG: 1. tiles_X: %lu, tiles_Y: %lu, "
+         "total_tiles: %lu, patch_count: %lu, target_width: %lu, "
+         "target_height: %lu\n",
+         tiles_X, tiles_Y, total_tiles, patch_count, target_width,
+         target_height);
+  printf("DEBUG bitmap size: %lu\n", )
 
   // one thread for every Patch*Target_patch
   const dim3 threads_find_kernel(32, 32);
   const dim3 grid_dim(
       (patch_count + threads_find_kernel.x - 1) / threads_find_kernel.x,
       (total_tiles + threads_find_kernel.y - 1) / threads_find_kernel.y);
+  printf("DEBUG: threads_find_kernel: (%u, %u), grid_dim: (%u, %u)\n",
+         threads_find_kernel.x, threads_find_kernel.y, grid_dim.x, grid_dim.y);
   find_source_patches_for_target_tiles<<<grid_dim, threads_find_kernel>>>(
       position_list, static_cast<uint32_t>(patch_count), patch_radius_x,
       patch_radius_y, static_cast<uint32_t>(target_width),
       static_cast<uint32_t>(total_tiles), used_patches_bitmap.data().get());
   // Add this immediately after the launch!
   check_launch_error("find_source_patches_for_target_tiles");
+  
+  // DEBUG
+  cuda_debug_print("find_source_patches_for_target_tiles");
+  thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
+  printf("DEBUG: 4. used_patches_bitmap\n");
+  for (size_t m = 0; m < total_tiles; m++) {
+    printf("%lu: ", m);
+    for (size_t n = 0; n < patch_count; n++) {
+      printf("%u ", bitmap_cpu[m * patch_count + n]);
+    }
+    printf("\n");
+  }
+  // DEBUG
 
   const auto [indices, patches_per_tile, tile_index_offsets] =
       compute_indices_from_bitmap(used_patches_bitmap, total_tiles,
