@@ -114,14 +114,6 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
 
-  // DEBUG
-  thrust::host_vector<uint32_t> row_offsets_cpu = row_offsets;
-  printf("DEBUG: row_sums\n");
-  for (size_t m = 0; m < rows; m++) {
-    printf("%lu: %u \n", m, row_offsets_cpu[m]);
-  }
-  // DEBUG
-
   //  write indices of patches together
   auto column_indices_begin = thrust::make_transform_iterator(
       thrust::counting_iterator<uint32_t>(0),
@@ -226,9 +218,9 @@ __global__ void fast_splat_2d_kernel(
 
   // iterate over all patches that need to be splatet into this tile
   uint32_t patches_for_this_tile = patches_per_tile[tile_id];
-  uint32_t tile_index_offsets_for_this_tile = tile_index_offsets[tile_id];
+  uint32_t patch_index_offsets_for_this_tile = tile_index_offsets[tile_id];
   for (uint32_t i = 0; i < patches_for_this_tile; i++) {
-    uint32_t patch_id = indices[tile_index_offsets_for_this_tile + i];
+    uint32_t patch_id = indices[patch_index_offsets_for_this_tile + i];
     float patch_center_pos_x = position_list[patch_id];
     float patch_center_pos_y = position_list[patch_id + patch_count];
     float patch_left = patch_center_pos_x - patch_radius_x;
@@ -260,6 +252,17 @@ __global__ void fast_splat_2d_kernel(
     }
   }
   __syncthreads();
+  if (tile_id == 1529 && threadIdx.x == 0) {
+    for (int i = 0; i < TILE_SIZE_Y; i++) {
+      for (int j = 0; j < TILE_SIZE_X; j++) {
+        if (i < 10 && j < 10) {
+          printf("(%f, %f, %f) ", tile[j + i * TILE_SIZE_X],
+                 tile[j + i * TILE_SIZE_X + tile_pixel_count],
+                 tile[j + i * TILE_SIZE_X + 2 * tile_pixel_count]);
+        }
+      }
+    }
+  }
 
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   // TODO problem is the color handling. Each thread should write out 3 numbers,
@@ -327,12 +330,9 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
 
   const size_t THREADS_SPLAT_KERNEL = 256;
   fast_splat_2d_kernel<<<total_tiles, THREADS_SPLAT_KERNEL>>>(
-      patch_list, patch_width,
-      patch_height, patch_count,
-      position_list, indices.data().get(), patches_per_tile.data().get(),
-      tile_index_offsets.data().get(), result,
-      target_width,
-      target_height);
+      patch_list, patch_width, patch_height, patch_count, position_list,
+      indices.data().get(), patches_per_tile.data().get(),
+      tile_index_offsets.data().get(), result, target_width, target_height);
   check_launch_error("fast_splat_2d_kernel");
 
   fflush(stdout);
