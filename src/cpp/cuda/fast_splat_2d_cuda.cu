@@ -105,7 +105,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
                                 bitmap.begin(), prefix_sum.begin());
 
   printf("prefix sum");
-  thrust::host_vector<uint8_t> prefix_sum_cpu = prefix_sum;
+  thrust::host_vector<uint32_t> prefix_sum_cpu = prefix_sum;
   for (uint32_t j = 0; j < prefix_sum_cpu.size(); j++) {
     printf("%u ", prefix_sum_cpu[j]);
   }
@@ -118,7 +118,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
                         row_sums.begin());
 
   printf("row_sums");
-  thrust::host_vector<uint8_t> row_sums_cpu = row_sums;
+  thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
   for (uint32_t j = 0; j < row_sums_cpu.size(); j++) {
     printf("%u ", row_sums_cpu[j]);
   }
@@ -362,7 +362,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
                                   patch_count);
 
   printf("indices:\n");
-  thrust::host_vector<uint8_t> indices_cpu = indices;
+  thrust::host_vector<uint32_t> indices_cpu = indices;
   for (uint32_t j = 0; j < indices_cpu.size(); j++) {
     printf("%u ", indices_cpu[j]);
   }
@@ -370,7 +370,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
 
 
   printf("offsets:\n");
-  thrust::host_vector<uint8_t> offsets_cpu = tile_index_offsets;
+  thrust::host_vector<uint32_t> offsets_cpu = tile_index_offsets;
   for (uint32_t j = 0; j < offsets_cpu.size(); j++) {
     printf("%u ", offsets_cpu[j]);
   }
