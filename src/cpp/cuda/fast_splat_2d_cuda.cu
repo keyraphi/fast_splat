@@ -318,6 +318,11 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       position_list, static_cast<uint32_t>(patch_count), patch_radius_x,
       patch_radius_y, static_cast<uint32_t>(target_width),
       static_cast<uint32_t>(total_tiles), used_patches_bitmap.data().get());
+  // Add this immediately after the launch!
+  cudaError_t launch_err = cudaGetLastError();
+  if (launch_err != cudaSuccess) {
+    printf("Launch Error: %s\n", cudaGetErrorString(launch_err));
+  }
 
   // DEBUG
   cuda_debug_print("find_source_patches_for_target_tiles");
