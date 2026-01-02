@@ -114,13 +114,13 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
 
-  // // DEBUG
-  // thrust::host_vector<uint32_t> row_offsets_cpu = row_offsets;
-  // printf("DEBUG: row_sums\n");
-  // for (size_t m = 0; m < rows; m++) {
-  //   printf("%lu: %u \n", m, row_offsets_cpu[m]);
-  // }
-  // // DEBUG
+  // DEBUG
+  thrust::host_vector<uint32_t> row_offsets_cpu = row_offsets;
+  printf("DEBUG: row_sums\n");
+  for (size_t m = 0; m < rows; m++) {
+    printf("%lu: %u \n", m, row_offsets_cpu[m]);
+  }
+  // DEBUG
 
   //  write indices of patches together
   auto column_indices_begin = thrust::make_transform_iterator(
@@ -327,12 +327,12 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
 
   const size_t THREADS_SPLAT_KERNEL = 256;
   fast_splat_2d_kernel<<<total_tiles, THREADS_SPLAT_KERNEL>>>(
-      patch_list, static_cast<uint32_t>(patch_width),
-      static_cast<uint32_t>(patch_height), static_cast<uint32_t>(patch_count),
+      patch_list, patch_width,
+      patch_height, patch_count,
       position_list, indices.data().get(), patches_per_tile.data().get(),
       tile_index_offsets.data().get(), result,
-      static_cast<uint32_t>(target_width),
-      static_cast<uint32_t>(target_height));
+      target_width,
+      target_height);
   check_launch_error("fast_splat_2d_kernel");
 
   fflush(stdout);
