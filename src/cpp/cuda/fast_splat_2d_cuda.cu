@@ -1,4 +1,5 @@
 #include "fast_splat_2d_cuda.h"
+#include <__clang_cuda_builtin_vars.h>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -218,8 +219,18 @@ __global__ void fast_splat_2d_kernel(
   // iterate over all patches that need to be splatet into this tile
   uint32_t patches_for_this_tile = patches_per_tile[tile_id];
   uint32_t patch_index_offsets_for_this_tile = tile_index_offsets[tile_id];
-  for (uint32_t i = 0; i < patches_for_this_tile; i++) {
-    uint32_t patch_id = indices[patch_index_offsets_for_this_tile + i];
+  // Every pixel of every patch has to be splatted into the tile
+  // consider every pixel in every patch as one work package
+  uint32_t total_work_packages_for_tile =
+      patches_for_this_tile * patch_pixel_count;
+
+  for (uint32_t i = threadIdx.x; i < total_work_packages_for_tile;
+       i += blockDim.x) {
+    uint32_t local_patch_id = i / patch_pixel_count;
+    uint32_t pixel_id = i % patch_pixel_count;
+    uint32_t patch_id =
+        indices[patch_index_offsets_for_this_tile + local_patch_id];
+
     float patch_center_pos_x = position_list[patch_id];
     float patch_center_pos_y = position_list[patch_id + patch_count];
     float patch_left = patch_center_pos_x - patch_radius_x;
@@ -227,29 +238,25 @@ __global__ void fast_splat_2d_kernel(
     float patch_left_in_tile = patch_left - tile_x_px;
     float patch_top_in_tile = patch_top - tile_y_px;
     size_t patch_based_idx =
-        static_cast<size_t>(patch_id) * patch_width * patch_height * 3;
-    // attomicly add the pixels of this patch to this tile at the correct
-    // positions using bilinear interpolation
-    for (uint32_t idx_in_patch = threadIdx.x;
-         idx_in_patch < patch_height * patch_width;
-         idx_in_patch += blockDim.x) {
-      float src_red = patch_list[patch_based_idx + idx_in_patch];
-      float src_green =
-          patch_list[patch_based_idx + idx_in_patch + patch_pixel_count];
-      float src_blue =
-          patch_list[patch_based_idx + idx_in_patch + 2 * patch_pixel_count];
+        static_cast<size_t>(patch_id) * patch_pixel_count * 3;
 
-      uint32_t x_in_patch = idx_in_patch % patch_width;
-      uint32_t y_in_patch = idx_in_patch / patch_width;
-      float x_in_tile = x_in_patch + patch_left_in_tile;
-      float y_in_tile = y_in_patch + patch_top_in_tile;
-      if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < TILE_SIZE_X &&
-          ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < TILE_SIZE_Y) {
-        bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
-                       tile);
-      }
+    uint32_t x_in_patch = pixel_id % patch_width; // TODO expensive
+    uint32_t y_in_patch = pixel_id / patch_width; // TODO expensive
+
+    float x_in_tile = x_in_patch + patch_left_in_tile;
+    float y_in_tile = y_in_patch + patch_top_in_tile;
+    if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < TILE_SIZE_X &&
+        ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < TILE_SIZE_Y) {
+
+      float src_red = patch_list[patch_based_idx + pixel_id];
+      float src_green =
+          patch_list[patch_based_idx + pixel_id + patch_pixel_count];
+      float src_blue =
+          patch_list[patch_based_idx + pixel_id + 2 * patch_pixel_count];
+      bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile, tile);
     }
   }
+
   __syncthreads();
 
   // add tile on top of the result. No attomic needed, as tiles don't overlap
