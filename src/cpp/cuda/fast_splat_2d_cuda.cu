@@ -49,55 +49,45 @@ __global__ void find_source_patches_for_target_tiles(
   uint32_t position_n = threadIdx.x + blockIdx.x * blockDim.x;
   uint32_t target_m = threadIdx.y + blockIdx.y * blockDim.y;
 
-  printf("position_n: %u, target_m: %u, patch_count: %u, target_count: %u\n",
-         position_n, target_m, patch_count, target_count);
+  if (position_n >= patch_count || target_m >= target_count) {
+    return;
+  }
+  uint32_t tid = target_m * patch_count + position_n;
 
-  // if (position_n >= patch_count || target_m >= target_count) {
-  //   return;
-  // }
-  // uint32_t tid = target_m * patch_count + position_n;
-  //
-  // const auto T_SIZE_X = static_cast<uint32_t>(TILE_SIZE_X);
-  // const auto T_SIZE_Y = static_cast<uint32_t>(TILE_SIZE_Y);
-  //
-  // uint32_t tiles_per_row = (target_width + T_SIZE_X - 1) / T_SIZE_X;
-  // uint32_t target_patch_y = target_m / tiles_per_row;
-  // uint32_t target_patch_x = target_m % tiles_per_row;
-  // auto target_x_left = static_cast<float>(target_patch_x * T_SIZE_X);
-  // auto target_y_top = static_cast<float>(target_patch_y * T_SIZE_Y);
-  // float target_x_right = target_x_left + static_cast<float>(T_SIZE_X);
-  // float target_y_bottom = target_y_top + static_cast<float>(T_SIZE_Y);
-  //
-  // float pos_x = position_list[position_n];
-  // float pos_y = position_list[position_n + patch_count];
-  // if (target_m == 0) {
-  //   printf("patch %u, pos_x: %f, pos_y: %f\n", position_n, pos_x, pos_y);
-  //   if (position_n == 0) {
-  //     printf("tile %u, (%f, %f), (%f, %f)\n", target_m, target_x_left,
-  //            target_y_top, target_x_right, target_y_bottom);
-  //   }
-  // }
-  //
-  // uint8_t is_in_m = 0;
-  //
-  // // Calculate extended influence area for bilinear interpolation
-  // float source_left = pos_x - ceilf(patch_radius_x);
-  // float source_right = pos_x + ceilf(patch_radius_x);
-  // float source_top = pos_y - ceilf(patch_radius_y);
-  // float source_bottom = pos_y + ceilf(patch_radius_y);
-  //
-  // // Check for overlap (using half-open intervals: [left, right) x [top,
-  // // bottom))
-  // bool x_overlap =
-  //     (source_right > target_x_left) && (source_left < target_x_right);
-  // bool y_overlap =
-  //     (source_bottom > target_y_top) && (source_top < target_y_bottom);
-  //
-  // if (x_overlap && y_overlap) {
-  //   is_in_m = 1;
-  // }
-  //
-  // bitmap[tid] = is_in_m;
+  const auto T_SIZE_X = static_cast<uint32_t>(TILE_SIZE_X);
+  const auto T_SIZE_Y = static_cast<uint32_t>(TILE_SIZE_Y);
+
+  uint32_t tiles_per_row = (target_width + T_SIZE_X - 1) / T_SIZE_X;
+  uint32_t target_patch_y = target_m / tiles_per_row;
+  uint32_t target_patch_x = target_m % tiles_per_row;
+  auto target_x_left = static_cast<float>(target_patch_x * T_SIZE_X);
+  auto target_y_top = static_cast<float>(target_patch_y * T_SIZE_Y);
+  float target_x_right = target_x_left + static_cast<float>(T_SIZE_X);
+  float target_y_bottom = target_y_top + static_cast<float>(T_SIZE_Y);
+
+  float pos_x = position_list[position_n];
+  float pos_y = position_list[position_n + patch_count];
+
+  uint8_t is_in_m = 0;
+
+  // Calculate extended influence area for bilinear interpolation
+  float source_left = pos_x - ceilf(patch_radius_x);
+  float source_right = pos_x + ceilf(patch_radius_x);
+  float source_top = pos_y - ceilf(patch_radius_y);
+  float source_bottom = pos_y + ceilf(patch_radius_y);
+
+  // Check for overlap (using half-open intervals: [left, right) x [top,
+  // bottom))
+  bool x_overlap =
+      (source_right > target_x_left) && (source_left < target_x_right);
+  bool y_overlap =
+      (source_bottom > target_y_top) && (source_top < target_y_bottom);
+
+  if (x_overlap && y_overlap) {
+    is_in_m = 1;
+  }
+
+  bitmap[tid] = is_in_m;
 }
 
 auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
@@ -305,7 +295,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
          target_height);
 
   // one thread for every Patch*Target_patch
-  const dim3 threads_find_kernel(64, 64);
+  const dim3 threads_find_kernel(32, 32);
   const dim3 grid_dim(
       (patch_count + threads_find_kernel.x - 1) / threads_find_kernel.x,
       (total_tiles + threads_find_kernel.y - 1) / threads_find_kernel.y);
@@ -325,7 +315,6 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   }
 
   // DEBUG
-  cuda_debug_print("find_source_patches_for_target_tiles");
   thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
   printf("DEBUG: 4. used_patches_bitmap\n");
   for (size_t m = 0; m < total_tiles; m++) {
@@ -346,6 +335,10 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       patch_list, patch_width, patch_height, patch_count, position_list,
       indices.data().get(), patches_per_tile.data().get(),
       tile_index_offsets.data().get(), result, target_width, target_height);
+  cudaError_t launch_err = cudaGetLastError();
+  if (launch_err != cudaSuccess) {
+    printf("Launch Error: %s\n", cudaGetErrorString(launch_err));
+  }
 
   fflush(stdout);
 }
