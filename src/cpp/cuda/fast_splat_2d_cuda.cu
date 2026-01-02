@@ -186,12 +186,12 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
 }
 
 __global__ void fast_splat_2d_kernel(
-    const float *__restrict__ patch_list, const size_t patch_width,
-    const size_t patch_height, const size_t patch_count,
+    const float *__restrict__ patch_list, const uint32_t patch_width,
+    const uint32_t patch_height, const uint32_t patch_count,
     const float *__restrict__ position_list, const uint32_t *indices,
     const uint32_t *patches_per_tile, const uint32_t *tile_index_offsets,
-    float *__restrict__ result, const size_t target_width,
-    const size_t target_height) {
+    float *__restrict__ result, const uint32_t target_width,
+    const uint32_t target_height) {
   uint32_t tile_id = blockIdx.x;
 
   uint32_t tiles_per_width = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
@@ -226,10 +226,6 @@ __global__ void fast_splat_2d_kernel(
     float patch_top = patch_center_pos_y - patch_radius_y;
     float patch_left_in_tile = patch_left - tile_x_px;
     float patch_top_in_tile = patch_top - tile_y_px;
-    if (tile_id == 63 && threadIdx.x == 0) {
-      printf("%u, (%f, %f), (%f, %f)\n", patch_id, patch_center_pos_x,
-             patch_center_pos_y, patch_left_in_tile, patch_top_in_tile);
-    }
     // attomicly add the pixels of this patch to this tile at the correct
     // positions using bilinear interpolation
     for (uint32_t idx_in_patch = threadIdx.x;
@@ -246,6 +242,9 @@ __global__ void fast_splat_2d_kernel(
       uint32_t y_in_patch = idx_in_patch / patch_width;
       float x_in_tile = x_in_patch + patch_left_in_tile;
       float y_in_tile = y_in_patch + patch_top_in_tile;
+      if (tile_id == 63 && patch_id == 0) {
+        printf("(%f, %f)\n", x_in_tile, y_in_tile);
+      }
       if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < TILE_SIZE_X &&
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < TILE_SIZE_Y) {
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
@@ -317,9 +316,9 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
 
   const size_t THREADS_SPLAT_KERNEL = 256;
   fast_splat_2d_kernel<<<total_tiles, THREADS_SPLAT_KERNEL>>>(
-      patch_list, patch_width, patch_height, patch_count, position_list,
+      patch_list, static_cast<uint32_t>(patch_width), static_cast<uint32_t>(patch_height), static_cast<uint32_t>(patch_count), position_list,
       indices.data().get(), patches_per_tile.data().get(),
-      tile_index_offsets.data().get(), result, target_width, target_height);
+      tile_index_offsets.data().get(), result, static_cast<uint32_t>(target_width), static_cast<uint32_t>(target_height));
   check_launch_error("fast_splat_2d_kernel");
 
   fflush(stdout);
