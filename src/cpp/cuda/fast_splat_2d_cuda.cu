@@ -20,6 +20,9 @@
 
 #define TILE_SIZE_X 32
 #define TILE_SIZE_Y 32
+// for avoidance of bank conflicts:
+#define STRIDE (TILE_SIZE_X + 8)
+#define TILE_SIZE (STRIDE * TILE_SIZE_Y)
 
 void check_launch_error(const std::string &kernel_name) {
   cudaError_t launch_err = cudaGetLastError();
@@ -142,25 +145,24 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
   const int right = left + 1;
   const int top = floorf(y_in_tile);
   const int bottom = top + 1;
-  const uint32_t pixels_in_tile = TILE_SIZE_X * TILE_SIZE_Y;
 
   if (left >= 0 && left < TILE_SIZE_X) {
     const float weight_left = static_cast<float>(right) - x_in_tile;
     if (top >= 0 && top < TILE_SIZE_Y) {
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_left * weight_top;
-      uint32_t tile_idx = left + top * TILE_SIZE_X;
+      uint32_t tile_idx = 3 * (top * STRIDE + left);
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
-      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      atomicAdd(tile + tile_idx + 1, src_green * weight);
+      atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_left * weight_bottom;
-      uint32_t tile_idx = left + bottom * TILE_SIZE_X;
+      uint32_t tile_idx = 3 * (left + bottom * STRIDE);
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
-      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      atomicAdd(tile + tile_idx + 1, src_green * weight);
+      atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
   }
   if (right >= 0 && right < TILE_SIZE_X) {
@@ -168,18 +170,18 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
     if (top >= 0 && top < TILE_SIZE_Y) {
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_right * weight_top;
-      uint32_t tile_idx = right + top * TILE_SIZE_X;
+      uint32_t tile_idx = 3 * (right + top * STRIDE);
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
-      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      atomicAdd(tile + tile_idx + 1, src_green * weight);
+      atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_right * weight_bottom;
-      uint32_t tile_idx = right + bottom * TILE_SIZE_X;
+      uint32_t tile_idx = 3 * (right + bottom * STRIDE);
       atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
-      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      atomicAdd(tile + tile_idx + 1, src_green * weight);
+      atomicAdd(tile + tile_idx + 2, src_blue * weight);
     }
   }
 }
@@ -208,8 +210,8 @@ __global__ void fast_splat_2d_kernel(
 
   // initialize a tile of shared memory with zeros (neutral element for
   // addition in the end)
-  __shared__ float tile[tile_pixel_count * 3];
-  for (uint32_t idx_in_tile = threadIdx.x; idx_in_tile < tile_pixel_count * 3;
+  __shared__ float tile[TILE_SIZE * 3];
+  for (uint32_t idx_in_tile = threadIdx.x; idx_in_tile < TILE_SIZE * 3;
        idx_in_tile += blockDim.x) {
     tile[idx_in_tile] = 0.f;
   }
@@ -262,25 +264,24 @@ __global__ void fast_splat_2d_kernel(
   // TODO problem is the color handling. Each thread should write out 3 numbers,
   // first r, then g, then b
   const size_t target_pixels = target_width * target_height;
-  for (uint32_t pos_in_tile = threadIdx.x; pos_in_tile < tile_pixel_count;
-       pos_in_tile += blockDim.x) {
-    uint32_t x_in_tile = pos_in_tile % TILE_SIZE_X;
-    uint32_t y_in_tile = pos_in_tile / TILE_SIZE_X;
+  for (uint32_t i = threadIdx.x; i < tile_pixel_count; i += blockDim.x) {
+    uint32_t x_in_tile = i % TILE_SIZE_X;
+    uint32_t y_in_tile = i / TILE_SIZE_X;
     uint32_t x_in_result = tile_x_px + x_in_tile;
     uint32_t y_in_result = tile_y_px + y_in_tile;
     if (x_in_result >= target_width || y_in_result >= target_height) {
       continue;
     }
     size_t pos_in_result = y_in_result * target_width + x_in_result;
+    size_t pos_in_tile = 3 * (x_in_tile + y_in_tile * STRIDE);
 
     // red
     result[pos_in_result] += tile[pos_in_tile];
     // green
-    result[pos_in_result + target_pixels] +=
-        tile[pos_in_tile + tile_pixel_count];
+    result[pos_in_result + target_pixels] += tile[pos_in_tile + 1];
     // blue
     result[pos_in_result + 2 * target_pixels] +=
-        tile[pos_in_tile + 2 * tile_pixel_count];
+        tile[pos_in_tile + 2];
   }
 }
 

@@ -11,6 +11,8 @@ target_compile_options(
     fast_splat_2d_backend
     PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
     PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>
+    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-use_fast_math>
+    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-fmad=true>
 )
 
 # Link dependencies
