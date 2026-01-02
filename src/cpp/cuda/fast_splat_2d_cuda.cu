@@ -136,19 +136,22 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
 }
 
 __device__ inline void aggregatedAtomicAdd(float *tile, const uint32_t dest,
-                                     float value) {
+                                           float value) {
   // all other threads with the same target
   uint32_t mask = __match_any_sync(0xFFFFFFFF, dest);
   // only one leader to do the atomic add in the end
   int leader = __ffs(mask) - 1;
   int lane_id = threadIdx.x % warpSize;
 
-  // do a tree aggregation of the values with the same destination
-  for (int offset = 16; offset > 0; offset /= 2) {
-    float remote_value = __shfl_down_sync(mask, value, offset);
-    if ((mask & (1u << (lane_id + offset)))) {
-      value += remote_value;
-    }
+  // We iterate through the mask bits
+  // waiters is a mask where all non added threads are sill 1
+  uint32_t waiters = mask ^ (1u << leader);
+  float sum = value;
+  while (waiters > 0) {
+    int next_lane = __ffs(waiters) - 1;
+    sum += __shfl_sync(mask, value, next_lane);
+    // check the lane we just added
+    waiters ^= (1u << next_lane);
   }
   if (lane_id == leader) {
     atomicAdd(tile + dest, value);
@@ -172,7 +175,8 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       uint32_t tile_idx = left + top * TILE_SIZE_X;
       aggregatedAtomicAdd(tile, tile_idx, src_red * weight);
       aggregatedAtomicAdd(tile, tile_idx + pixels_in_tile, src_green * weight);
-      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile,
+                          src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
@@ -180,7 +184,8 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       uint32_t tile_idx = left + bottom * TILE_SIZE_X;
       aggregatedAtomicAdd(tile, tile_idx, src_red * weight);
       aggregatedAtomicAdd(tile, tile_idx + pixels_in_tile, src_green * weight);
-      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile,
+                          src_blue * weight);
     }
   }
   if (right >= 0 && right < TILE_SIZE_X) {
@@ -191,7 +196,8 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       uint32_t tile_idx = right + top * TILE_SIZE_X;
       aggregatedAtomicAdd(tile, tile_idx, src_red * weight);
       aggregatedAtomicAdd(tile, tile_idx + pixels_in_tile, src_green * weight);
-      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile,
+                          src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
@@ -199,7 +205,8 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       uint32_t tile_idx = right + bottom * TILE_SIZE_X;
       aggregatedAtomicAdd(tile, tile_idx, src_red * weight);
       aggregatedAtomicAdd(tile, tile_idx + pixels_in_tile, src_green * weight);
-      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile,
+                          src_blue * weight);
     }
   }
 }
