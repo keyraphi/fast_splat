@@ -339,7 +339,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
     for (uint32_t j = 0; j < patch_count; j++) {
       printf("%u ", bitmap_cpu[i*patch_count + j]);
     }
-    printf("\n")
+    printf("\n");
   }
 
   const auto [indices, patches_per_tile, tile_index_offsets] =
