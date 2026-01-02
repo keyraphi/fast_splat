@@ -219,6 +219,9 @@ __global__ void fast_splat_2d_kernel(
   // iterate over all patches that need to be splatet into this tile
   uint32_t patches_for_this_tile = patches_per_tile[tile_id];
   uint32_t patch_index_offsets_for_this_tile = tile_index_offsets[tile_id];
+  if (threadIdx== 0) {
+    printf("patches for this tile: %u, offset: %u\n", patches_for_this_tile, patch_index_offsets_for_this_tile);
+  }
   for (uint32_t i = 0; i < patches_for_this_tile; i++) {
     uint32_t patch_id = indices[patch_index_offsets_for_this_tile + i];
     float patch_center_pos_x = position_list[patch_id];
