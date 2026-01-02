@@ -1,5 +1,4 @@
 #include "fast_splat_2d_cuda.h"
-#include <__clang_cuda_builtin_vars.h>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
