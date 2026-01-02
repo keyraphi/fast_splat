@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(fast_splat_2d VERSION 0.1.0 LANGUAGES C CXX CUDA)
+project(fast_splat_2d VERSION 0.2.0 LANGUAGES C CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
