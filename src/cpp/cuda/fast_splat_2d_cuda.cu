@@ -1,4 +1,5 @@
 #include "fast_splat_2d_cuda.h"
+#include <__clang_cuda_builtin_vars.h>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -24,7 +25,8 @@
 void check_launch_error(const std::string &kernel_name) {
   cudaError_t launch_err = cudaGetLastError();
   if (launch_err != cudaSuccess) {
-    printf("%s: Launch Error: %s\n", kernel_name.c_str(), cudaGetErrorString(launch_err));
+    printf("%s: Launch Error: %s\n", kernel_name.c_str(),
+           cudaGetErrorString(launch_err));
   }
 }
 
@@ -194,8 +196,8 @@ __global__ void fast_splat_2d_kernel(
   uint32_t tile_id = blockIdx.x;
 
   uint32_t tiles_per_width = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
-  uint32_t tile_x = tile_id % tiles_per_width;
-  uint32_t tile_y = tile_id / tiles_per_width;
+  uint32_t tile_x = tile_id % tiles_per_width; // TODO do this using grid
+  uint32_t tile_y = tile_id / tiles_per_width; // TODO do this using grid
 
   uint32_t tile_x_px = tile_x * TILE_SIZE_X;
   uint32_t tile_y_px = tile_y * TILE_SIZE_Y;
@@ -225,6 +227,10 @@ __global__ void fast_splat_2d_kernel(
     float patch_top = patch_center_pos_y - patch_radius_y;
     float patch_left_in_tile = patch_left - tile_x_px;
     float patch_top_in_tile = patch_top - tile_y_px;
+    if (tile_id == 63 && threadIdx.x == 0 && patch_id < 10) {
+      printf("%u, (%f, %f), (%f, %f)\n", patch_id, patch_center_pos_x,
+             patch_center_pos_y, patch_left_in_tile, patch_top_in_tile);
+    }
     // attomicly add the pixels of this patch to this tile at the correct
     // positions using bilinear interpolation
     for (uint32_t idx_in_patch = threadIdx.x;
@@ -299,8 +305,6 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   // DEBUG
   printf("DEBUG: threads_find_kernel: (%u, %u), grid_dim: (%u, %u)\n",
          threads_find_kernel.x, threads_find_kernel.y, grid_dim.x, grid_dim.y);
-  // DEBUG
-  // TODO I need debug prints somehow. This kernel does not seem to run at all
   find_source_patches_for_target_tiles<<<grid_dim, threads_find_kernel>>>(
       position_list, static_cast<uint32_t>(patch_count), patch_radius_x,
       patch_radius_y, static_cast<uint32_t>(target_width),
@@ -308,23 +312,11 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   // Add this immediately after the launch!
   check_launch_error("find_source_patches_for_target_tiles");
 
-  // DEBUG
-  thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
-  printf("DEBUG: 4. used_patches_bitmap\n");
-  for (size_t m = 0; m < total_tiles; m++) {
-    printf("%lu: ", m);
-    for (size_t n = 0; n < patch_count; n++) {
-      printf("%u ", bitmap_cpu[m * patch_count + n]);
-    }
-    printf("\n");
-  }
-  // DEBUG
-
   const auto [indices, patches_per_tile, tile_index_offsets] =
       compute_indices_from_bitmap(used_patches_bitmap, total_tiles,
                                   patch_count);
 
-  const size_t THREADS_SPLAT_KERNEL = 128;
+  const size_t THREADS_SPLAT_KERNEL = 256;
   fast_splat_2d_kernel<<<total_tiles, THREADS_SPLAT_KERNEL>>>(
       patch_list, patch_width, patch_height, patch_count, position_list,
       indices.data().get(), patches_per_tile.data().get(),
