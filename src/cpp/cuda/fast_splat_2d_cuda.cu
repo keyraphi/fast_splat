@@ -110,7 +110,6 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
                         bitmap.begin(), thrust::discard_iterator<>(),
                         row_sums.begin());
 
-
   // start of each row
   thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
@@ -119,7 +118,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   thrust::host_vector<uint32_t> row_offsets_cpu = row_offsets;
   printf("DEBUG: row_sums\n");
   for (size_t m = 0; m < rows; m++) {
-    printf("%lu: %u \n", m, row_sums_cpu[m]);
+    printf("%lu: %u \n", m, row_offsets_cpu[m]);
   }
   // DEBUG
 
@@ -236,17 +235,18 @@ __global__ void fast_splat_2d_kernel(
     float patch_top = patch_center_pos_y - patch_radius_y;
     float patch_left_in_tile = patch_left - tile_x_px;
     float patch_top_in_tile = patch_top - tile_y_px;
+    size_t patch_based_idx =
+        static_cast<size_t>(patch_id) * patch_width * patch_height * 3;
     // attomicly add the pixels of this patch to this tile at the correct
     // positions using bilinear interpolation
     for (uint32_t idx_in_patch = threadIdx.x;
          idx_in_patch < patch_height * patch_width;
          idx_in_patch += blockDim.x) {
-      float src_red =
-          patch_list[patch_id * patch_width * patch_height * 3 + idx_in_patch];
-      float src_green = patch_list[patch_id * patch_width * patch_height * 3 +
-                                   idx_in_patch + patch_pixel_count];
-      float src_blue = patch_list[patch_id * patch_width * patch_height * 3 +
-                                  idx_in_patch + 2 * patch_pixel_count];
+      float src_red = patch_list[patch_based_idx + idx_in_patch];
+      float src_green =
+          patch_list[patch_based_idx + idx_in_patch + patch_pixel_count];
+      float src_blue =
+          patch_list[patch_based_idx + idx_in_patch + 2 * patch_pixel_count];
 
       uint32_t x_in_patch = idx_in_patch % patch_width;
       uint32_t y_in_patch = idx_in_patch / patch_width;
