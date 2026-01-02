@@ -52,52 +52,52 @@ __global__ void find_source_patches_for_target_tiles(
   printf("position_n: %u, target_m: %u, patch_count: %u, target_count: %u\n",
          position_n, target_m, patch_count, target_count);
 
-  if (position_n >= patch_count || target_m >= target_count) {
-    return;
-  }
-  uint32_t tid = target_m * patch_count + position_n;
-
-  const auto T_SIZE_X = static_cast<uint32_t>(TILE_SIZE_X);
-  const auto T_SIZE_Y = static_cast<uint32_t>(TILE_SIZE_Y);
-
-  uint32_t tiles_per_row = (target_width + T_SIZE_X - 1) / T_SIZE_X;
-  uint32_t target_patch_y = target_m / tiles_per_row;
-  uint32_t target_patch_x = target_m % tiles_per_row;
-  auto target_x_left = static_cast<float>(target_patch_x * T_SIZE_X);
-  auto target_y_top = static_cast<float>(target_patch_y * T_SIZE_Y);
-  float target_x_right = target_x_left + static_cast<float>(T_SIZE_X);
-  float target_y_bottom = target_y_top + static_cast<float>(T_SIZE_Y);
-
-  float pos_x = position_list[position_n];
-  float pos_y = position_list[position_n + patch_count];
-  if (target_m == 0) {
-    printf("patch %u, pos_x: %f, pos_y: %f\n", position_n, pos_x, pos_y);
-    if (position_n == 0) {
-      printf("tile %u, (%f, %f), (%f, %f)\n", target_m, target_x_left,
-             target_y_top, target_x_right, target_y_bottom);
-    }
-  }
-
-  uint8_t is_in_m = 0;
-
-  // Calculate extended influence area for bilinear interpolation
-  float source_left = pos_x - ceilf(patch_radius_x);
-  float source_right = pos_x + ceilf(patch_radius_x);
-  float source_top = pos_y - ceilf(patch_radius_y);
-  float source_bottom = pos_y + ceilf(patch_radius_y);
-
-  // Check for overlap (using half-open intervals: [left, right) x [top,
-  // bottom))
-  bool x_overlap =
-      (source_right > target_x_left) && (source_left < target_x_right);
-  bool y_overlap =
-      (source_bottom > target_y_top) && (source_top < target_y_bottom);
-
-  if (x_overlap && y_overlap) {
-    is_in_m = 1;
-  }
-
-  bitmap[tid] = is_in_m;
+  // if (position_n >= patch_count || target_m >= target_count) {
+  //   return;
+  // }
+  // uint32_t tid = target_m * patch_count + position_n;
+  //
+  // const auto T_SIZE_X = static_cast<uint32_t>(TILE_SIZE_X);
+  // const auto T_SIZE_Y = static_cast<uint32_t>(TILE_SIZE_Y);
+  //
+  // uint32_t tiles_per_row = (target_width + T_SIZE_X - 1) / T_SIZE_X;
+  // uint32_t target_patch_y = target_m / tiles_per_row;
+  // uint32_t target_patch_x = target_m % tiles_per_row;
+  // auto target_x_left = static_cast<float>(target_patch_x * T_SIZE_X);
+  // auto target_y_top = static_cast<float>(target_patch_y * T_SIZE_Y);
+  // float target_x_right = target_x_left + static_cast<float>(T_SIZE_X);
+  // float target_y_bottom = target_y_top + static_cast<float>(T_SIZE_Y);
+  //
+  // float pos_x = position_list[position_n];
+  // float pos_y = position_list[position_n + patch_count];
+  // if (target_m == 0) {
+  //   printf("patch %u, pos_x: %f, pos_y: %f\n", position_n, pos_x, pos_y);
+  //   if (position_n == 0) {
+  //     printf("tile %u, (%f, %f), (%f, %f)\n", target_m, target_x_left,
+  //            target_y_top, target_x_right, target_y_bottom);
+  //   }
+  // }
+  //
+  // uint8_t is_in_m = 0;
+  //
+  // // Calculate extended influence area for bilinear interpolation
+  // float source_left = pos_x - ceilf(patch_radius_x);
+  // float source_right = pos_x + ceilf(patch_radius_x);
+  // float source_top = pos_y - ceilf(patch_radius_y);
+  // float source_bottom = pos_y + ceilf(patch_radius_y);
+  //
+  // // Check for overlap (using half-open intervals: [left, right) x [top,
+  // // bottom))
+  // bool x_overlap =
+  //     (source_right > target_x_left) && (source_left < target_x_right);
+  // bool y_overlap =
+  //     (source_bottom > target_y_top) && (source_top < target_y_bottom);
+  //
+  // if (x_overlap && y_overlap) {
+  //   is_in_m = 1;
+  // }
+  //
+  // bitmap[tid] = is_in_m;
 }
 
 auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
@@ -313,6 +313,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   printf("DEBUG: threads_find_kernel: (%u, %u), grid_dim: (%u, %u)\n",
          threads_find_kernel.x, threads_find_kernel.y, grid_dim.x, grid_dim.y);
   // DEBUG
+  // TODO I need debug prints somehow. This kernel does not seem to run at all
   find_source_patches_for_target_tiles<<<grid_dim, threads_find_kernel>>>(
       position_list, static_cast<uint32_t>(patch_count), patch_radius_x,
       patch_radius_y, static_cast<uint32_t>(target_width),
