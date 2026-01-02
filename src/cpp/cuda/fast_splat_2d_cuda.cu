@@ -194,23 +194,23 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
 }
 
 __global__ void fast_splat_2d_kernel(
-    const float *__restrict__ patch_list, const uint32_t patch_width,
-    const uint32_t patch_height, const uint32_t patch_count,
+    const float *__restrict__ patch_list, const size_t patch_width,
+    const size_t patch_height, const size_t patch_count,
     const float *__restrict__ position_list, const uint32_t *indices,
     const uint32_t *patches_per_tile, const uint32_t *tile_index_offsets,
-    float *__restrict__ result, const uint32_t target_width,
-    const uint32_t target_height) {
-  uint32_t tile_id = blockIdx.x;
+    float *__restrict__ result, const size_t target_width,
+    const size_t target_height) {
+  size_t tile_id = blockIdx.x;
 
-  uint32_t tiles_per_width = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
-  uint32_t tile_x = tile_id % tiles_per_width; // TODO do this using grid
-  uint32_t tile_y = tile_id / tiles_per_width; // TODO do this using grid
+  size_t tiles_per_width = (target_width + TILE_SIZE_X - 1) / TILE_SIZE_X;
+  size_t tile_x = tile_id % tiles_per_width; // TODO do this using grid
+  size_t tile_y = tile_id / tiles_per_width; // TODO do this using grid
 
-  uint32_t tile_x_px = tile_x * TILE_SIZE_X;
-  uint32_t tile_y_px = tile_y * TILE_SIZE_Y;
+  size_t tile_x_px = tile_x * TILE_SIZE_X;
+  size_t tile_y_px = tile_y * TILE_SIZE_Y;
 
-  const uint32_t patch_pixel_count = patch_width * patch_height;
-  const uint32_t tile_pixel_count = TILE_SIZE_X * TILE_SIZE_Y;
+  const size_t patch_pixel_count = patch_width * patch_height;
+  const size_t tile_pixel_count = TILE_SIZE_X * TILE_SIZE_Y;
 
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
@@ -264,7 +264,7 @@ __global__ void fast_splat_2d_kernel(
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   // TODO problem is the color handling. Each thread should write out 3 numbers,
   // first r, then g, then b
-  const uint32_t target_pixels = target_width * target_height;
+  const size_t target_pixels = target_width * target_height;
   for (uint32_t pos_in_tile = threadIdx.x; pos_in_tile < tile_pixel_count;
        pos_in_tile += blockDim.x) {
     uint32_t x_in_tile = pos_in_tile % TILE_SIZE_X;
@@ -274,7 +274,7 @@ __global__ void fast_splat_2d_kernel(
     if (x_in_result >= target_width || y_in_result >= target_height) {
       continue;
     }
-    uint32_t pos_in_result = y_in_result * target_width + x_in_result;
+    size_t pos_in_result = y_in_result * target_width + x_in_result;
 
     // red
     result[pos_in_result] += tile[pos_in_tile];
