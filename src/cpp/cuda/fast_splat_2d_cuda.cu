@@ -21,13 +21,10 @@
 #define TILE_SIZE_X 32
 #define TILE_SIZE_Y 32
 
-void cuda_debug_print(const std::string &kernel_name) {
-  cudaError_t err = cudaDeviceSynchronize();
-  if (err != cudaSuccess) {
-    printf("%s: CUDA Error: %s\n", kernel_name.c_str(),
-           cudaGetErrorString(err));
-  } else {
-    printf("Kernel %s finished successfully!\n", kernel_name.c_str());
+void check_launch_error(const std::string &kernel_name) {
+  cudaError_t launch_err = cudaGetLastError();
+  if (launch_err != cudaSuccess) {
+    printf("%s: Launch Error: %s\n", kernel_name.c_str(), cudaGetErrorString(launch_err));
   }
 }
 
@@ -309,10 +306,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       patch_radius_y, static_cast<uint32_t>(target_width),
       static_cast<uint32_t>(total_tiles), used_patches_bitmap.data().get());
   // Add this immediately after the launch!
-  cudaError_t launch_err = cudaGetLastError();
-  if (launch_err != cudaSuccess) {
-    printf("Launch Error: %s\n", cudaGetErrorString(launch_err));
-  }
+  check_launch_error("find_source_patches_for_target_tiles");
 
   // DEBUG
   thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
@@ -335,10 +329,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       patch_list, patch_width, patch_height, patch_count, position_list,
       indices.data().get(), patches_per_tile.data().get(),
       tile_index_offsets.data().get(), result, target_width, target_height);
-  cudaError_t launch_err = cudaGetLastError();
-  if (launch_err != cudaSuccess) {
-    printf("Launch Error: %s\n", cudaGetErrorString(launch_err));
-  }
+  check_launch_error("fast_splat_2d_kernel");
 
   fflush(stdout);
 }
