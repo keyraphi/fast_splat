@@ -333,6 +333,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   // Add this immediately after the launch!
   check_launch_error("find_source_patches_for_target_tiles");
 
+  printf("bitmap:\n");
   thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
   for (uint32_t i = 0; i < total_tiles; i++) {
     printf("%u: ", i);
@@ -345,6 +346,27 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   const auto [indices, patches_per_tile, tile_index_offsets] =
       compute_indices_from_bitmap(used_patches_bitmap, total_tiles,
                                   patch_count);
+
+  printf("indices:\n");
+  thrust::host_vector<uint8_t> indices_cpu = indices;
+  for (uint32_t j = 0; j < indices_cpu.size(); j++) {
+    printf("%u ", indices_cpu[j]);
+  }
+  printf("\n");
+
+  printf("patches per tile:\n");
+  thrust::host_vector<uint8_t> patches_per_tile_cpu = patches_per_tile_cpu;
+  for (uint32_t j = 0; j < patches_per_tile_cpu.size(); j++) {
+    printf("%u ", patches_per_tile_cpu[j]);
+  }
+  printf("\n");
+
+  printf("offsets:\n");
+  thrust::host_vector<uint8_t> offsets_cpu = tile_index_offsets;
+  for (uint32_t j = 0; j < offsets_cpu.size(); j++) {
+    printf("%u ", bitmap_cpu[j]);
+  }
+  printf("\n");
 
   const size_t THREADS_SPLAT_KERNEL = 256;
   fast_splat_2d_kernel<<<total_tiles, THREADS_SPLAT_KERNEL>>>(
