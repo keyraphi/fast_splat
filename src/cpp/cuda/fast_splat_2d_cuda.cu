@@ -104,7 +104,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   thrust::exclusive_scan_by_key(keys_begin, keys_begin + (rows * columns),
                                 bitmap.begin(), prefix_sum.begin());
 
-  printf("prefix sum");
+  printf("prefix sum\n");
   thrust::host_vector<uint32_t> prefix_sum_cpu = prefix_sum;
   for (uint32_t j = 0; j < prefix_sum_cpu.size(); j++) {
     printf("%u ", prefix_sum_cpu[j]);
@@ -117,7 +117,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
                         bitmap.begin(), thrust::discard_iterator<>(),
                         row_sums.begin());
 
-  printf("row_sums");
+  printf("row_sums\n");
   thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
   for (uint32_t j = 0; j < row_sums_cpu.size(); j++) {
     printf("%u ", row_sums_cpu[j]);
