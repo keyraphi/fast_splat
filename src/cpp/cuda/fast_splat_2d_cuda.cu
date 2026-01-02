@@ -245,27 +245,12 @@ __global__ void fast_splat_2d_kernel(
       float y_in_tile = y_in_patch + patch_top_in_tile;
       if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < TILE_SIZE_X &&
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < TILE_SIZE_Y) {
-        if (tile_id == 63 && patch_id == 0) {
-          printf("(%f, %f)\n", x_in_tile, y_in_tile);
-        }
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
       }
     }
   }
   __syncthreads();
-  if (tile_id == 63 && threadIdx.x == 0) {
-    for (int i = 0; i < TILE_SIZE_Y; i++) {
-      for (int j = 0; j < TILE_SIZE_X; j++) {
-        if (i > 25 && j > 25) {
-          printf("(%f, %f, %f) ", tile[i * TILE_SIZE_X + j + 0],
-                 tile[i * TILE_SIZE_X + j + tile_pixel_count],
-                 tile[i * TILE_SIZE_X + j + 2 * tile_pixel_count]);
-        }
-      }
-      printf("\n");
-    }
-  }
 
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   // TODO problem is the color handling. Each thread should write out 3 numbers,
@@ -308,20 +293,11 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
 
-  printf("DEBUG: 1. tiles_X: %lu, tiles_Y: %lu, "
-         "total_tiles: %lu, patch_count: %lu, target_width: %lu, "
-         "target_height: %lu\n",
-         tiles_X, tiles_Y, total_tiles, patch_count, target_width,
-         target_height);
-
   // one thread for every Patch*Target_patch
   const dim3 threads_find_kernel(32, 32);
   const dim3 grid_dim(
       (patch_count + threads_find_kernel.x - 1) / threads_find_kernel.x,
       (total_tiles + threads_find_kernel.y - 1) / threads_find_kernel.y);
-  // DEBUG
-  printf("DEBUG: threads_find_kernel: (%u, %u), grid_dim: (%u, %u)\n",
-         threads_find_kernel.x, threads_find_kernel.y, grid_dim.x, grid_dim.y);
   find_source_patches_for_target_tiles<<<grid_dim, threads_find_kernel>>>(
       position_list, static_cast<uint32_t>(patch_count), patch_radius_x,
       patch_radius_y, static_cast<uint32_t>(target_width),
