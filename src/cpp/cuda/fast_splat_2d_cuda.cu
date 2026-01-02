@@ -110,14 +110,6 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
                         bitmap.begin(), thrust::discard_iterator<>(),
                         row_sums.begin());
 
-  // DEBUG
-  thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
-  printf("DEBUG: row_sums\n");
-  for (size_t m = 0; m < rows; m++) {
-    printf("%lu: %u \n", m, row_sums_cpu[m]);
-  }
-  // DEBUG
-
   // start of each row
   thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
@@ -133,6 +125,8 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   // Count the number of 1s first to allocate the right size
   // equivalent to summing up sums of rows
   uint32_t total_ones = thrust::reduce(row_sums.begin(), row_sums.end());
+  size_t test = thrust::reduce(row_sums.begin(), row_sums.end());
+  printf("DEBUG: total_ones: %u, vs. %lu", total_ones, test);
   thrust::device_vector<uint32_t> result(total_ones);
 
   thrust::copy_if(column_indices_begin, // Source: column indices
