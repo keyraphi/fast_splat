@@ -254,16 +254,21 @@ __global__ void fast_splat_2d_kernel(
   }
   __syncthreads();
   if (tile_id == 63 && threadIdx.x == 0) {
-    for (int i = 0; i< TILE_SIZE_Y; i++) {
-      for(int j = 0; j < TILE_SIZE_X; j++) {
-        printf("(%f, %f, %f) ", tile[i * TILE_SIZE_X + j + 0], tile[i * TILE_SIZE_X + j + TILE_SIZE_X*TILE_SIZE_Y], tile[i * TILE_SIZE_X + j + 2*TILE_SIZE_X*TILE_SIZE_Y]);
+    for (int i = 0; i < TILE_SIZE_Y; i++) {
+      for (int j = 0; j < TILE_SIZE_X; j++) {
+        if (i > 25 && j > 25) {
+          printf("(%f, %f, %f) ", tile[i * TILE_SIZE_X + j + 0],
+                 tile[i * TILE_SIZE_X + j + TILE_SIZE_X * TILE_SIZE_Y],
+                 tile[i * TILE_SIZE_X + j + 2 * TILE_SIZE_X * TILE_SIZE_Y]);
+        }
       }
       printf("\n");
     }
   }
 
   // add tile on top of the result. No attomic needed, as tiles don't overlap
-  // TODO problem is the color handling. Each thread should write out 3 numbers, first r, then g, then b
+  // TODO problem is the color handling. Each thread should write out 3 numbers,
+  // first r, then g, then b
   const uint32_t target_pixels = target_width * target_height;
   for (uint32_t idx_in_tile = threadIdx.x;
        idx_in_tile < TILE_SIZE_X * TILE_SIZE_Y * 3; idx_in_tile += blockDim.x) {
