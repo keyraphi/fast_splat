@@ -202,15 +202,16 @@ __global__ void fast_splat_2d_kernel(
   uint32_t tile_y_px = tile_y * TILE_SIZE_Y;
 
   const uint32_t patch_pixel_count = patch_width * patch_height;
+  const uint32_t tile_pixel_count = TILE_SIZE_X * TILE_SIZE_Y;
 
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
 
   // initialize a tile of shared memory with zeros (neutral element for
   // addition in the end)
-  __shared__ float tile[TILE_SIZE_X * TILE_SIZE_Y * 3];
-  for (uint32_t idx_in_tile = threadIdx.x;
-       idx_in_tile < TILE_SIZE_X * TILE_SIZE_Y * 3; idx_in_tile += blockDim.x) {
+  __shared__ float tile[tile_pixel_count * 3];
+  for (uint32_t idx_in_tile = threadIdx.x; idx_in_tile < tile_pixel_count * 3;
+       idx_in_tile += blockDim.x) {
     tile[idx_in_tile] = 0.f;
   }
   __syncthreads();
@@ -258,8 +259,8 @@ __global__ void fast_splat_2d_kernel(
       for (int j = 0; j < TILE_SIZE_X; j++) {
         if (i > 25 && j > 25) {
           printf("(%f, %f, %f) ", tile[i * TILE_SIZE_X + j + 0],
-                 tile[i * TILE_SIZE_X + j + TILE_SIZE_X * TILE_SIZE_Y],
-                 tile[i * TILE_SIZE_X + j + 2 * TILE_SIZE_X * TILE_SIZE_Y]);
+                 tile[i * TILE_SIZE_X + j + tile_pixel_count],
+                 tile[i * TILE_SIZE_X + j + 2 * tile_pixel_count]);
         }
       }
       printf("\n");
@@ -270,10 +271,8 @@ __global__ void fast_splat_2d_kernel(
   // TODO problem is the color handling. Each thread should write out 3 numbers,
   // first r, then g, then b
   const uint32_t target_pixels = target_width * target_height;
-  for (uint32_t idx_in_tile = threadIdx.x;
-       idx_in_tile < TILE_SIZE_X * TILE_SIZE_Y * 3; idx_in_tile += blockDim.x) {
-    uint32_t color_idx = idx_in_tile % 3;
-    uint32_t pos_in_tile = idx_in_tile / 3;
+  for (uint32_t pos_in_tile = threadIdx.x; pos_in_tile < tile_pixel_count;
+       pos_in_tile += blockDim.x) {
     uint32_t x_in_tile = pos_in_tile % TILE_SIZE_X;
     uint32_t y_in_tile = pos_in_tile / TILE_SIZE_X;
     uint32_t x_in_result = tile_x_px + x_in_tile;
@@ -281,10 +280,16 @@ __global__ void fast_splat_2d_kernel(
     if (x_in_result >= target_width || y_in_result >= target_height) {
       continue;
     }
-    uint32_t idx_in_result =
-        y_in_result * target_width + x_in_result + color_idx * target_pixels;
+    uint32_t pos_in_result = y_in_result * target_width + x_in_result;
 
-    result[idx_in_result] += tile[idx_in_tile];
+    // red
+    result[pos_in_result] += tile[pos_in_tile];
+    // green
+    result[pos_in_result + target_pixels] +=
+        tile[pos_in_tile + tile_pixel_count];
+    // blue
+    result[pos_in_result + 2 * target_pixels] +=
+        tile[pos_in_tile + 2 * tile_pixel_count];
   }
 }
 
