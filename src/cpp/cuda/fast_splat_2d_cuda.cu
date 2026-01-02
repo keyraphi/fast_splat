@@ -100,23 +100,14 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   auto keys_begin = thrust::make_transform_iterator(
       thrust::counting_iterator<uint32_t>(0), make_key);
 
-  thrust::device_vector<uint32_t> prefix_sum(rows * columns);
   auto bitmap_u32_begin = thrust::make_transform_iterator(
-      bitmap.begin(), thrust::identity<uint32_t>());
-  thrust::exclusive_scan_by_key(keys_begin, keys_begin + (rows * columns),
-                                bitmap_u32_begin, prefix_sum.begin());
-
-  printf("prefix sum\n");
-  thrust::host_vector<uint32_t> prefix_sum_cpu = prefix_sum;
-  for (uint32_t j = 0; j < prefix_sum_cpu.size(); j++) {
-    printf("%u ", prefix_sum_cpu[j]);
-  }
-  printf("\n");
+      bitmap.begin(),
+      [] __host__ __device__(uint8_t val) { return (uint32_t)val; });
 
   // number of entries per row
   thrust::device_vector<uint32_t> row_sums(rows);
   thrust::reduce_by_key(keys_begin, keys_begin + (rows * columns),
-                        bitmap.begin(), thrust::discard_iterator<>(),
+                        bitmap_u32_begin, thrust::discard_iterator<>(),
                         row_sums.begin());
 
   printf("row_sums\n");
