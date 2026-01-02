@@ -110,6 +110,14 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
                         bitmap.begin(), thrust::discard_iterator<>(),
                         row_sums.begin());
 
+  // DEBUG
+  thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
+  printf("DEBUG: row_sums\n");
+  for (size_t m = 0; m < rows; m++) {
+    printf("%lu: %u \n", m, row_sums_cpu[m]);
+  }
+  // DEBUG
+
   // start of each row
   thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
@@ -311,18 +319,6 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
       static_cast<uint32_t>(total_tiles), used_patches_bitmap.data().get());
   // Add this immediately after the launch!
   check_launch_error("find_source_patches_for_target_tiles");
-  
-  // DEBUG
-  thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
-  printf("DEBUG: 4. used_patches_bitmap\n");
-  for (size_t m = 0; m < total_tiles; m++) {
-    printf("%lu: ", m);
-    for (size_t n = 0; n < patch_count; n++) {
-      printf("%u ", bitmap_cpu[m * patch_count + n]);
-    }
-    printf("\n");
-  }
-  // DEBUG
 
   const auto [indices, patches_per_tile, tile_index_offsets] =
       compute_indices_from_bitmap(used_patches_bitmap, total_tiles,
