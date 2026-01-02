@@ -104,11 +104,25 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   thrust::exclusive_scan_by_key(keys_begin, keys_begin + (rows * columns),
                                 bitmap.begin(), prefix_sum.begin());
 
+  printf("prefix sum");
+  thrust::host_vector<uint8_t> prefix_sum_cpu = prefix_sum;
+  for (uint32_t j = 0; j < prefix_sum_cpu.size(); j++) {
+    printf("%u ", prefix_sum_cpu[j]);
+  }
+  printf("\n");
+
   // number of entries per row
   thrust::device_vector<uint32_t> row_sums(rows);
   thrust::reduce_by_key(keys_begin, keys_begin + (rows * columns),
                         bitmap.begin(), thrust::discard_iterator<>(),
                         row_sums.begin());
+
+  printf("row_sums");
+  thrust::host_vector<uint8_t> row_sums_cpu = row_sums;
+  for (uint32_t j = 0; j < row_sums_cpu.size(); j++) {
+    printf("%u ", row_sums_cpu[j]);
+  }
+  printf("\n");
 
   // start of each row
   thrust::device_vector<uint32_t> row_offsets(rows);
@@ -354,12 +368,6 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   }
   printf("\n");
 
-  printf("patches per tile:\n");
-  thrust::host_vector<uint8_t> patches_per_tile_cpu = patches_per_tile;
-  for (uint32_t j = 0; j < patches_per_tile_cpu.size(); j++) {
-    printf("%u ", patches_per_tile_cpu[j]);
-  }
-  printf("\n");
 
   printf("offsets:\n");
   thrust::host_vector<uint8_t> offsets_cpu = tile_index_offsets;
@@ -367,6 +375,15 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
     printf("%u ", offsets_cpu[j]);
   }
   printf("\n");
+//
+// bitmap:
+// 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
+// indices:
+// 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 
+// patches per tile:
+// 44 
+// offsets:
+// 0 
 
   const size_t THREADS_SPLAT_KERNEL = 256;
   fast_splat_2d_kernel<<<total_tiles, THREADS_SPLAT_KERNEL>>>(
