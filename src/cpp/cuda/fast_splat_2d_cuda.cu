@@ -101,8 +101,10 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
       thrust::counting_iterator<uint32_t>(0), make_key);
 
   thrust::device_vector<uint32_t> prefix_sum(rows * columns);
+  auto bitmap_u32_begin = thrust::make_transform_iterator(
+      bitmap.begin(), thrust::identity<uint32_t>());
   thrust::exclusive_scan_by_key(keys_begin, keys_begin + (rows * columns),
-                                bitmap.begin(), prefix_sum.begin());
+                                bitmap_u32_begin, prefix_sum.begin());
 
   printf("prefix sum\n");
   thrust::host_vector<uint32_t> prefix_sum_cpu = prefix_sum;
@@ -352,7 +354,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   for (uint32_t i = 0; i < total_tiles; i++) {
     printf("%u: ", i);
     for (uint32_t j = 0; j < patch_count; j++) {
-      printf("%u ", bitmap_cpu[i*patch_count + j]);
+      printf("%u ", bitmap_cpu[i * patch_count + j]);
     }
     printf("\n");
   }
@@ -368,22 +370,20 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   }
   printf("\n");
 
-
   printf("offsets:\n");
   thrust::host_vector<uint32_t> offsets_cpu = tile_index_offsets;
   for (uint32_t j = 0; j < offsets_cpu.size(); j++) {
     printf("%u ", offsets_cpu[j]);
   }
   printf("\n");
-//
-// bitmap:
-// 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-// indices:
-// 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 
-// patches per tile:
-// 44 
-// offsets:
-// 0 
+  //
+  // bitmap:
+  // 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
+  // indices:
+  // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27
+  // 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 patches per tile: 44
+  // offsets:
+  // 0
 
   const size_t THREADS_SPLAT_KERNEL = 256;
   fast_splat_2d_kernel<<<total_tiles, THREADS_SPLAT_KERNEL>>>(
