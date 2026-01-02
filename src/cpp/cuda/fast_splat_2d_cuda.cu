@@ -226,7 +226,7 @@ __global__ void fast_splat_2d_kernel(
     float patch_top = patch_center_pos_y - patch_radius_y;
     float patch_left_in_tile = patch_left - tile_x_px;
     float patch_top_in_tile = patch_top - tile_y_px;
-    if (tile_id == 63 && threadIdx.x == 0 && patch_id < 10) {
+    if (tile_id == 63 && threadIdx.x == 0) {
       printf("%u, (%f, %f), (%f, %f)\n", patch_id, patch_center_pos_x,
              patch_center_pos_y, patch_left_in_tile, patch_top_in_tile);
     }
