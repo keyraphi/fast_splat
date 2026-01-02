@@ -109,14 +109,6 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   thrust::reduce_by_key(keys_begin, keys_begin + (rows * columns),
                         bitmap_u32_begin, thrust::discard_iterator<>(),
                         row_sums.begin());
-
-  printf("row_sums\n");
-  thrust::host_vector<uint32_t> row_sums_cpu = row_sums;
-  for (uint32_t j = 0; j < row_sums_cpu.size(); j++) {
-    printf("%u ", row_sums_cpu[j]);
-  }
-  printf("\n");
-
   // start of each row
   thrust::device_vector<uint32_t> row_offsets(rows);
   thrust::exclusive_scan(row_sums.begin(), row_sums.end(), row_offsets.begin());
@@ -226,10 +218,6 @@ __global__ void fast_splat_2d_kernel(
   // iterate over all patches that need to be splatet into this tile
   uint32_t patches_for_this_tile = patches_per_tile[tile_id];
   uint32_t patch_index_offsets_for_this_tile = tile_index_offsets[tile_id];
-  if (threadIdx.x == 0) {
-    printf("patches for this tile: %u, offset: %u\n", patches_for_this_tile,
-           patch_index_offsets_for_this_tile);
-  }
   for (uint32_t i = 0; i < patches_for_this_tile; i++) {
     uint32_t patch_id = indices[patch_index_offsets_for_this_tile + i];
     float patch_center_pos_x = position_list[patch_id];
@@ -240,11 +228,6 @@ __global__ void fast_splat_2d_kernel(
     float patch_top_in_tile = patch_top - tile_y_px;
     size_t patch_based_idx =
         static_cast<size_t>(patch_id) * patch_width * patch_height * 3;
-    if (tile_id == 0 && threadIdx.x == 0) {
-      printf("tile %lu, patch %u: (%f, %f), (%f, %f)\n", tile_id, patch_id,
-             patch_center_pos_x, patch_center_pos_y, patch_left_in_tile,
-             patch_top_in_tile);
-    }
     // attomicly add the pixels of this patch to this tile at the correct
     // positions using bilinear interpolation
     for (uint32_t idx_in_patch = threadIdx.x;
@@ -268,17 +251,6 @@ __global__ void fast_splat_2d_kernel(
     }
   }
   __syncthreads();
-  if (tile_id == 0 && threadIdx.x == 0) {
-    for (int i = 0; i < TILE_SIZE_Y; i++) {
-      for (int j = 0; j < TILE_SIZE_X; j++) {
-        if (i < 10 && j < 10) {
-          printf("(%f, %f, %f) ", tile[j + i * TILE_SIZE_X],
-                 tile[j + i * TILE_SIZE_X + tile_pixel_count],
-                 tile[j + i * TILE_SIZE_X + 2 * tile_pixel_count]);
-        }
-      }
-    }
-  }
 
   // add tile on top of the result. No attomic needed, as tiles don't overlap
   // TODO problem is the color handling. Each thread should write out 3 numbers,
@@ -320,19 +292,12 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   float patch_radius_x = patch_width / 2.F;
   float patch_radius_y = patch_height / 2.F;
   fflush(stdout);
-  printf("DEBUG: 1. tiles_X: %lu, tiles_Y: %lu, "
-         "total_tiles: %lu, patch_count: %lu, target_width: %lu, "
-         "target_height: %lu\n",
-         tiles_X, tiles_Y, total_tiles, patch_count, target_width,
-         target_height);
 
   // one thread for every Patch*Target_patch
   const dim3 threads_find_kernel(32, 32);
   const dim3 grid_dim(
       (patch_count + threads_find_kernel.x - 1) / threads_find_kernel.x,
       (total_tiles + threads_find_kernel.y - 1) / threads_find_kernel.y);
-  printf("DEBUG: threads_find_kernel: (%u, %u), grid_dim: (%u, %u)\n",
-         threads_find_kernel.x, threads_find_kernel.y, grid_dim.x, grid_dim.y);
   find_source_patches_for_target_tiles<<<grid_dim, threads_find_kernel>>>(
       position_list, static_cast<uint32_t>(patch_count), patch_radius_x,
       patch_radius_y, static_cast<uint32_t>(target_width),
@@ -340,41 +305,9 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   // Add this immediately after the launch!
   check_launch_error("find_source_patches_for_target_tiles");
 
-  printf("bitmap:\n");
-  thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
-  for (uint32_t i = 0; i < total_tiles; i++) {
-    printf("%u: ", i);
-    for (uint32_t j = 0; j < patch_count; j++) {
-      printf("%u ", bitmap_cpu[i * patch_count + j]);
-    }
-    printf("\n");
-  }
-
   const auto [indices, patches_per_tile, tile_index_offsets] =
       compute_indices_from_bitmap(used_patches_bitmap, total_tiles,
                                   patch_count);
-
-  printf("indices:\n");
-  thrust::host_vector<uint32_t> indices_cpu = indices;
-  for (uint32_t j = 0; j < indices_cpu.size(); j++) {
-    printf("%u ", indices_cpu[j]);
-  }
-  printf("\n");
-
-  printf("offsets:\n");
-  thrust::host_vector<uint32_t> offsets_cpu = tile_index_offsets;
-  for (uint32_t j = 0; j < offsets_cpu.size(); j++) {
-    printf("%u ", offsets_cpu[j]);
-  }
-  printf("\n");
-  //
-  // bitmap:
-  // 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-  // indices:
-  // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27
-  // 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 patches per tile: 44
-  // offsets:
-  // 0
 
   const size_t THREADS_SPLAT_KERNEL = 256;
   fast_splat_2d_kernel<<<total_tiles, THREADS_SPLAT_KERNEL>>>(
