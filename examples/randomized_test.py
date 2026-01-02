@@ -30,8 +30,8 @@ def main():
 
     print(f"CPU result sum: {result_cpu.sum()}, GPU result sum: {result_gpu.sum()}")
 
-    result_cpu = result_cpu.permute([2, 0, 1])
-    result_gpu = result_gpu.permute([2, 0, 1])
+    result_cpu = result_cpu.permute([1, 2, 0])
+    result_gpu = result_gpu.permute([1, 2, 0])
 
     fig_cpu = plt.figure()
     ax = fig_cpu.add_subplot(111)
