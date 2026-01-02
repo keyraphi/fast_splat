@@ -355,7 +355,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   printf("\n");
 
   printf("patches per tile:\n");
-  thrust::host_vector<uint8_t> patches_per_tile_cpu = patches_per_tile_cpu;
+  thrust::host_vector<uint8_t> patches_per_tile_cpu = patches_per_tile;
   for (uint32_t j = 0; j < patches_per_tile_cpu.size(); j++) {
     printf("%u ", patches_per_tile_cpu[j]);
   }
@@ -364,7 +364,7 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   printf("offsets:\n");
   thrust::host_vector<uint8_t> offsets_cpu = tile_index_offsets;
   for (uint32_t j = 0; j < offsets_cpu.size(); j++) {
-    printf("%u ", bitmap_cpu[j]);
+    printf("%u ", offsets_cpu[j]);
   }
   printf("\n");
 
