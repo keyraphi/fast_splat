@@ -135,6 +135,30 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
   return {result, row_sums, row_offsets};
 }
 
+__device__ inline void aggregatedAtomicAdd(float *tile, const uint32_t dest,
+                                           float value) {
+  // all other threads with the same target
+  uint32_t active = __activemask();
+  uint32_t mask = __match_any_sync(active, dest);
+  // only one leader to do the atomic add in the end
+  int leader = __ffs(mask) - 1;
+  int lane_id = threadIdx.x % warpSize;
+
+  // We iterate through the mask bits
+  // waiters is a mask where all non added threads are sill 1
+  uint32_t waiters = mask ^ (1u << leader);
+  float sum = value;
+  while (waiters > 0) {
+    int next_lane = __ffs(waiters) - 1;
+    sum += __shfl_sync(mask, value, next_lane);
+    // check the lane we just added
+    waiters ^= (1u << next_lane);
+  }
+  if (lane_id == leader) {
+    atomicAdd(tile + dest, sum);
+  }
+}
+
 __device__ inline void
 bilinear_splat(const float src_red, const float src_green, const float src_blue,
                const float x_in_tile, const float y_in_tile, float *tile) {
@@ -150,17 +174,19 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_left * weight_top;
       uint32_t tile_idx = left + top * TILE_SIZE_X;
-      atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
-      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      aggregatedAtomicAdd(tile, tile_idx, src_red * weight);
+      aggregatedAtomicAdd(tile, tile_idx + pixels_in_tile, src_green * weight);
+      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile,
+                          src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_left * weight_bottom;
       uint32_t tile_idx = left + bottom * TILE_SIZE_X;
-      atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
-      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      aggregatedAtomicAdd(tile, tile_idx, src_red * weight);
+      aggregatedAtomicAdd(tile, tile_idx + pixels_in_tile, src_green * weight);
+      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile,
+                          src_blue * weight);
     }
   }
   if (right >= 0 && right < TILE_SIZE_X) {
@@ -169,17 +195,19 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_right * weight_top;
       uint32_t tile_idx = right + top * TILE_SIZE_X;
-      atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
-      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      aggregatedAtomicAdd(tile, tile_idx, src_red * weight);
+      aggregatedAtomicAdd(tile, tile_idx + pixels_in_tile, src_green * weight);
+      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile,
+                          src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_right * weight_bottom;
       uint32_t tile_idx = right + bottom * TILE_SIZE_X;
-      atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + pixels_in_tile, src_green * weight);
-      atomicAdd(tile + tile_idx + 2 * pixels_in_tile, src_blue * weight);
+      aggregatedAtomicAdd(tile, tile_idx, src_red * weight);
+      aggregatedAtomicAdd(tile, tile_idx + pixels_in_tile, src_green * weight);
+      aggregatedAtomicAdd(tile, tile_idx + 2 * pixels_in_tile,
+                          src_blue * weight);
     }
   }
 }
