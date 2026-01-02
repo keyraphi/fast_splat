@@ -297,7 +297,6 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
          "target_height: %lu\n",
          tiles_X, tiles_Y, total_tiles, patch_count, target_width,
          target_height);
-  printf("DEBUG bitmap size: %lu\n", )
 
   // one thread for every Patch*Target_patch
   const dim3 threads_find_kernel(32, 32);
@@ -314,7 +313,6 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
   check_launch_error("find_source_patches_for_target_tiles");
   
   // DEBUG
-  cuda_debug_print("find_source_patches_for_target_tiles");
   thrust::host_vector<uint8_t> bitmap_cpu = used_patches_bitmap;
   printf("DEBUG: 4. used_patches_bitmap\n");
   for (size_t m = 0; m < total_tiles; m++) {
