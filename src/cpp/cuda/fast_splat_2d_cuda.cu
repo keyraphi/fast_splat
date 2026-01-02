@@ -242,11 +242,11 @@ __global__ void fast_splat_2d_kernel(
       uint32_t y_in_patch = idx_in_patch / patch_width;
       float x_in_tile = x_in_patch + patch_left_in_tile;
       float y_in_tile = y_in_patch + patch_top_in_tile;
-      if (tile_id == 63 && patch_id == 0) {
-        printf("(%f, %f)\n", x_in_tile, y_in_tile);
-      }
       if (ceilf(x_in_tile) >= 0 && floorf(x_in_tile) < TILE_SIZE_X &&
           ceilf(y_in_tile) >= 0 && floorf(y_in_tile) < TILE_SIZE_Y) {
+        if (tile_id == 63 && patch_id == 0) {
+          printf("(%f, %f)\n", x_in_tile, y_in_tile);
+        }
         bilinear_splat(src_red, src_green, src_blue, x_in_tile, y_in_tile,
                        tile);
       }
@@ -316,9 +316,12 @@ fast_splat_2d_cuda_impl(const float *__restrict__ patch_list,
 
   const size_t THREADS_SPLAT_KERNEL = 256;
   fast_splat_2d_kernel<<<total_tiles, THREADS_SPLAT_KERNEL>>>(
-      patch_list, static_cast<uint32_t>(patch_width), static_cast<uint32_t>(patch_height), static_cast<uint32_t>(patch_count), position_list,
-      indices.data().get(), patches_per_tile.data().get(),
-      tile_index_offsets.data().get(), result, static_cast<uint32_t>(target_width), static_cast<uint32_t>(target_height));
+      patch_list, static_cast<uint32_t>(patch_width),
+      static_cast<uint32_t>(patch_height), static_cast<uint32_t>(patch_count),
+      position_list, indices.data().get(), patches_per_tile.data().get(),
+      tile_index_offsets.data().get(), result,
+      static_cast<uint32_t>(target_width),
+      static_cast<uint32_t>(target_height));
   check_launch_error("fast_splat_2d_kernel");
 
   fflush(stdout);
