@@ -150,7 +150,7 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       const float weight = weight_left * weight_top;
       atomicAdd(tile[0][top] + left, src_red * weight);
       atomicAdd(tile[1][top] + left, src_green * weight);
-      atomicAdd(tile[1][top] + left, src_blue * weight);
+      atomicAdd(tile[2][top] + left, src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
@@ -173,8 +173,8 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_right * weight_bottom;
       atomicAdd(tile[0][bottom] + right, src_red * weight);
-      atomicAdd(tile[0][bottom] + right, src_green * weight);
-      atomicAdd(tile[0][bottom] + right, src_blue * weight);
+      atomicAdd(tile[1][bottom] + right, src_green * weight);
+      atomicAdd(tile[2][bottom] + right, src_blue * weight);
     }
   }
 }
