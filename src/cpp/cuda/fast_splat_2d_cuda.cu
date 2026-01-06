@@ -20,9 +20,6 @@
 
 #define TILE_SIZE_X 32
 #define TILE_SIZE_Y 32
-// for avoidance of bank conflicts:
-#define STRIDE (TILE_SIZE_X + 8)
-#define TILE_SIZE (STRIDE * TILE_SIZE_Y)
 
 void check_launch_error(const std::string &kernel_name) {
   cudaError_t launch_err = cudaGetLastError();
@@ -140,7 +137,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
 
 __device__ inline void
 bilinear_splat(const float src_red, const float src_green, const float src_blue,
-               const float x_in_tile, const float y_in_tile, float *tile) {
+               const float x_in_tile, const float y_in_tile, float tile[3][TILE_SIZE_Y][TILE_SIZE_X+1]) {
   const int left = floorf(x_in_tile);
   const int right = left + 1;
   const int top = floorf(y_in_tile);
@@ -151,18 +148,16 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
     if (top >= 0 && top < TILE_SIZE_Y) {
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_left * weight_top;
-      uint32_t tile_idx = 3 * (top * STRIDE + left);
-      atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_green * weight);
-      atomicAdd(tile + tile_idx + 2, src_blue * weight);
+      atomicAdd(tile[0][top] + left, src_red * weight);
+      atomicAdd(tile[1][top] + left, src_green * weight);
+      atomicAdd(tile[1][top] + left, src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_left * weight_bottom;
-      uint32_t tile_idx = 3 * (left + bottom * STRIDE);
-      atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_green * weight);
-      atomicAdd(tile + tile_idx + 2, src_blue * weight);
+      atomicAdd(tile[0][bottom] + left, src_red * weight);
+      atomicAdd(tile[1][bottom] + left, src_green * weight);
+      atomicAdd(tile[2][bottom] + left, src_blue * weight);
     }
   }
   if (right >= 0 && right < TILE_SIZE_X) {
@@ -170,18 +165,16 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
     if (top >= 0 && top < TILE_SIZE_Y) {
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_right * weight_top;
-      uint32_t tile_idx = 3 * (right + top * STRIDE);
-      atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_green * weight);
-      atomicAdd(tile + tile_idx + 2, src_blue * weight);
+      atomicAdd(tile[0][top] + right, src_red * weight);
+      atomicAdd(tile[1][top] + right, src_green * weight);
+      atomicAdd(tile[2][top] + right, src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_right * weight_bottom;
-      uint32_t tile_idx = 3 * (right + bottom * STRIDE);
-      atomicAdd(tile + tile_idx, src_red * weight);
-      atomicAdd(tile + tile_idx + 1, src_green * weight);
-      atomicAdd(tile + tile_idx + 2, src_blue * weight);
+      atomicAdd(tile[0][bottom] + right, src_red * weight);
+      atomicAdd(tile[0][bottom] + right, src_green * weight);
+      atomicAdd(tile[0][bottom] + right, src_blue * weight);
     }
   }
 }
@@ -210,10 +203,14 @@ __global__ void fast_splat_2d_kernel(
 
   // initialize a tile of shared memory with zeros (neutral element for
   // addition in the end)
-  __shared__ float tile[TILE_SIZE * 3];
-  for (uint32_t idx_in_tile = threadIdx.x; idx_in_tile < TILE_SIZE * 3;
-       idx_in_tile += blockDim.x) {
-    tile[idx_in_tile] = 0.f;
+  __shared__ float tile[3][TILE_SIZE_Y][TILE_SIZE_X + 1];
+  for (uint32_t idx_in_tile = threadIdx.x;
+       idx_in_tile < TILE_SIZE_X * TILE_SIZE_Y; idx_in_tile += blockDim.x) {
+    uint32_t x = idx_in_tile % TILE_SIZE_X;
+    uint32_t y = idx_in_tile / TILE_SIZE_X;
+    tile[0][y][x] = 0.f;
+    tile[1][y][x] = 0.f;
+    tile[2][y][x] = 0.f;
   }
   __syncthreads();
 
@@ -227,7 +224,9 @@ __global__ void fast_splat_2d_kernel(
 
   for (uint32_t i = threadIdx.x; i < total_work_packages_for_tile;
        i += blockDim.x) {
-    uint32_t local_patch_id = i / patch_pixel_count;
+    uint32_t local_patch_id =
+        i / patch_pixel_count; // Those two divisions might be quite expensive
+                               // especially on older GPUS
     uint32_t pixel_id = i % patch_pixel_count;
     uint32_t patch_id =
         indices[patch_index_offsets_for_this_tile + local_patch_id];
@@ -273,15 +272,13 @@ __global__ void fast_splat_2d_kernel(
       continue;
     }
     size_t pos_in_result = y_in_result * target_width + x_in_result;
-    size_t pos_in_tile = 3 * (x_in_tile + y_in_tile * STRIDE);
 
     // red
-    result[pos_in_result] += tile[pos_in_tile];
+    result[pos_in_result] += tile[0][y_in_tile][x_in_tile];
     // green
-    result[pos_in_result + target_pixels] += tile[pos_in_tile + 1];
+    result[pos_in_result + target_pixels] += tile[1][y_in_tile][x_in_tile];
     // blue
-    result[pos_in_result + 2 * target_pixels] +=
-        tile[pos_in_tile + 2];
+    result[pos_in_result + 2 * target_pixels] += tile[2][y_in_tile][x_in_tile];
   }
 }
 
