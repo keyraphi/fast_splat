@@ -20,6 +20,7 @@
 
 #define TILE_SIZE_X 32
 #define TILE_SIZE_Y 32
+#define TILE_SIZE_PADDED TILE_SIZE_X + 8
 
 void check_launch_error(const std::string &kernel_name) {
   cudaError_t launch_err = cudaGetLastError();
@@ -137,7 +138,7 @@ auto compute_indices_from_bitmap(thrust::device_vector<uint8_t> &bitmap,
 
 __device__ inline void
 bilinear_splat(const float src_red, const float src_green, const float src_blue,
-               const float x_in_tile, const float y_in_tile, float tile[3][TILE_SIZE_Y][TILE_SIZE_X+1]) {
+               const float x_in_tile, const float y_in_tile, float tile[3][TILE_SIZE_Y][TILE_SIZE_PADDED]) {
   const int left = floorf(x_in_tile);
   const int right = left + 1;
   const int top = floorf(y_in_tile);
@@ -148,16 +149,16 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
     if (top >= 0 && top < TILE_SIZE_Y) {
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_left * weight_top;
-      atomicAdd(tile[0][top] + left, src_red * weight);
-      atomicAdd(tile[1][top] + left, src_green * weight);
-      atomicAdd(tile[2][top] + left, src_blue * weight);
+      atomicAdd(&tile[0][top][left], src_red * weight);
+      atomicAdd(&tile[1][top][left], src_green * weight);
+      atomicAdd(&tile[2][top][left], src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_left * weight_bottom;
-      atomicAdd(tile[0][bottom] + left, src_red * weight);
-      atomicAdd(tile[1][bottom] + left, src_green * weight);
-      atomicAdd(tile[2][bottom] + left, src_blue * weight);
+      atomicAdd(&tile[0][bottom][left], src_red * weight);
+      atomicAdd(&tile[1][bottom][left], src_green * weight);
+      atomicAdd(&tile[2][bottom][left], src_blue * weight);
     }
   }
   if (right >= 0 && right < TILE_SIZE_X) {
@@ -165,16 +166,16 @@ bilinear_splat(const float src_red, const float src_green, const float src_blue,
     if (top >= 0 && top < TILE_SIZE_Y) {
       const float weight_top = static_cast<float>(bottom) - y_in_tile;
       const float weight = weight_right * weight_top;
-      atomicAdd(tile[0][top] + right, src_red * weight);
-      atomicAdd(tile[1][top] + right, src_green * weight);
-      atomicAdd(tile[2][top] + right, src_blue * weight);
+      atomicAdd(&tile[0][top][right], src_red * weight);
+      atomicAdd(&tile[1][top][right], src_green * weight);
+      atomicAdd(&tile[2][top][right], src_blue * weight);
     }
     if (bottom >= 0 && bottom < TILE_SIZE_Y) {
       const float weight_bottom = y_in_tile - static_cast<float>(top);
       const float weight = weight_right * weight_bottom;
-      atomicAdd(tile[0][bottom] + right, src_red * weight);
-      atomicAdd(tile[1][bottom] + right, src_green * weight);
-      atomicAdd(tile[2][bottom] + right, src_blue * weight);
+      atomicAdd(&tile[0][bottom][right], src_red * weight);
+      atomicAdd(&tile[1][bottom][right], src_green * weight);
+      atomicAdd(&tile[2][bottom][right], src_blue * weight);
     }
   }
 }
@@ -203,7 +204,7 @@ __global__ void fast_splat_2d_kernel(
 
   // initialize a tile of shared memory with zeros (neutral element for
   // addition in the end)
-  __shared__ float tile[3][TILE_SIZE_Y][TILE_SIZE_X + 1];
+  __shared__ float tile[3][TILE_SIZE_Y][TILE_SIZE_PADDED];
   for (uint32_t idx_in_tile = threadIdx.x;
        idx_in_tile < TILE_SIZE_X * TILE_SIZE_Y; idx_in_tile += blockDim.x) {
     uint32_t x = idx_in_tile % TILE_SIZE_X;
